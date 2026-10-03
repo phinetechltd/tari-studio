@@ -1,0 +1,27 @@
+# dependencies / build
+node_modules/
+.next/
+.next-*/
+out/
+*.tsbuildinfo
+next-env.d.ts
+
+# local secrets and state — never committed
+.env
+.env.*
+!.env.example
+platform/.pg/
+platform/uploads/
+# generated images and videos (STORAGE_DIR); back them up, do not commit them
+platform/storage/
+*.log
+
+# editor / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# tooling scratch
+.playwright-mcp/
+NUL

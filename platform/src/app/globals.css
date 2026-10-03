@@ -1,0 +1,547 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Colour variables mirror src/lib/design-tokens.ts — a unit test fails if the
+ * two drift. Values are "r g b" triplets so Tailwind opacity modifiers work.
+ * The root layout pins data-theme="dark"; the light set stays declared (and
+ * tested) for pages that opt into .theme-light.
+ */
+:root {
+  --c-bg: 255 255 255;
+  --c-surface: 246 247 248;
+  --c-raised: 255 255 255;
+  --c-line: 224 227 231;
+  --c-ink: 17 19 22;
+  --c-muted: 96 104 114;
+  --c-primary: 14 116 144;
+  --c-onprimary: 255 255 255;
+  --c-success: 21 128 61;
+  --c-warning: 180 83 9;
+  --c-danger: 185 28 28;
+  --c-info: 3 105 161;
+  --c-wash: 17 19 22;
+  color-scheme: light;
+}
+
+:root[data-theme="dark"] {
+  --c-bg: 0 0 0;
+  --c-surface: 7 7 7;
+  --c-raised: 22 22 22;
+  --c-line: 38 38 38;
+  --c-ink: 232 232 232;
+  --c-muted: 148 148 148;
+  --c-primary: 0 198 255;
+  --c-onprimary: 0 0 0;
+  --c-success: 93 243 215;
+  --c-warning: 255 159 81;
+  --c-danger: 255 110 110;
+  --c-info: 125 180 255;
+  --c-wash: 255 255 255;
+  color-scheme: dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --c-bg: 0 0 0;
+    --c-surface: 7 7 7;
+    --c-raised: 22 22 22;
+    --c-line: 38 38 38;
+    --c-ink: 232 232 232;
+    --c-muted: 148 148 148;
+    --c-primary: 0 198 255;
+    --c-onprimary: 0 0 0;
+    --c-success: 93 243 215;
+    --c-warning: 255 159 81;
+    --c-danger: 255 110 110;
+    --c-info: 125 180 255;
+    --c-wash: 255 255 255;
+    color-scheme: dark;
+  }
+}
+
+/* A light island inside the dark product (print-style pages). Kept equal to :root by a unit test. */
+.theme-light {
+  --c-bg: 255 255 255;
+  --c-surface: 246 247 248;
+  --c-raised: 255 255 255;
+  --c-line: 224 227 231;
+  --c-ink: 17 19 22;
+  --c-muted: 96 104 114;
+  --c-primary: 14 116 144;
+  --c-onprimary: 255 255 255;
+  --c-success: 21 128 61;
+  --c-warning: 180 83 9;
+  --c-danger: 185 28 28;
+  --c-info: 3 105 161;
+  --c-wash: 17 19 22;
+  color-scheme: light;
+}
+
+html,
+body {
+  background-color: rgb(var(--c-surface));
+  color: rgb(var(--c-ink));
+}
+
+body {
+  font-family: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Visible keyboard focus everywhere; the console is used for hours. */
+:focus-visible {
+  outline: 2px solid rgb(var(--c-primary));
+  outline-offset: 2px;
+}
+
+::selection {
+  background: rgb(var(--c-primary) / 0.3);
+}
+
+@layer components {
+  .card {
+    @apply rounded-card border border-wash/[0.08] bg-raised;
+  }
+  .panel {
+    @apply rounded-xl border border-wash/[0.1] bg-raised;
+  }
+  .btn {
+    @apply inline-flex min-h-[40px] items-center justify-center gap-2 rounded-full px-4 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-primary text-onprimary hover:bg-primary/85;
+  }
+  .btn-quiet {
+    @apply btn border border-line bg-wash/[0.05] text-ink hover:bg-wash/[0.1];
+  }
+  .btn-ghost {
+    @apply btn text-muted hover:bg-wash/[0.08] hover:text-ink;
+  }
+  .btn-danger {
+    @apply btn border border-danger/40 text-danger hover:bg-danger/10;
+  }
+  /* The lime-to-cyan pill: token balance and the one call to action per screen. */
+  .pill-gradient {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-[linear-gradient(90deg,#4C8DFF,#00D4FF_95%)] px-4 font-semibold text-[#04121F];
+  }
+  .glass {
+    @apply border border-wash/[0.14] bg-raised/70 backdrop-blur-xl;
+  }
+  .input {
+    @apply min-h-[44px] w-full rounded-xl border border-line bg-wash/[0.04] px-3 text-sm text-ink placeholder:text-muted/80 focus:border-primary/60 focus:outline-none;
+  }
+  select.input {
+    @apply bg-raised;
+  }
+  .label {
+    @apply mb-1 block text-sm font-medium text-ink;
+  }
+  .tag-new {
+    @apply rounded-md bg-success/10 px-1.5 py-0.5 text-[11px] font-medium uppercase leading-none tracking-wide text-success;
+  }
+  .tag-hot {
+    @apply rounded-md bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium uppercase leading-none tracking-wide text-warning;
+  }
+}
+
+/*
+ * Animated AI chat (src/components/ui/animated-ai-chat.tsx). The band it sits
+ * in is dark in both themes. The keyframes live here rather than being
+ * injected by the component at import time.
+ */
+.lab-bg::before {
+  overflow: hidden;
+  max-width: 100vw;
+  max-height: 100vh;
+  box-sizing: border-box;
+}
+
+@keyframes ripple {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.6;
+  }
+  100% {
+    transform: scale(2);
+    opacity: 0;
+  }
+}
+
+/* Thin, dark scrollbars so panels do not flash a white gutter. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--c-wash) / 0.22) transparent;
+}
+
+/* Glows, pulses and the pointer-following light are decoration; honour the OS setting. */
+@media (prefers-reduced-motion: reduce) {
+  .motion-safe-only {
+    display: none !important;
+  }
+  .animate-pulse {
+    animation: none !important;
+  }
+  * {
+    scroll-behavior: auto !important;
+  }
+}
+
+
+/*
+ * Brand colours (src/lib/brand.ts): the logo's blue bar (#1E63FF to #00D4FF), purple stem
+ * (#8B2CF5) and orange play button (#FF7A1A). Used on the public pages.
+ */
+.text-brand-gradient {
+  background-image: linear-gradient(90deg, #3d7bff, #00d4ff 38%, #a45cff 68%, #ff8a2a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.bg-brand-gradient {
+  background-image: linear-gradient(135deg, #1e63ff, #00d4ff 45%, #8b2cf5 75%, #ff7a1a);
+}
+
+/* Endless rows of clips on the landing page. The track holds the items twice. */
+.marquee {
+  display: flex;
+  width: max-content;
+  animation: marquee var(--marquee-duration, 60s) linear infinite;
+}
+.marquee-reverse {
+  animation-direction: reverse;
+}
+.marquee-host:hover .marquee,
+.marquee-host:focus-within .marquee {
+  animation-play-state: paused;
+}
+@keyframes marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .marquee {
+    animation: none;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * African theme for the public pages (landing, pricing). Opt in with
+ * .theme-afro on a wrapper: it re-points the colour variables, so every
+ * token-based class (bg-bg, text-primary, btn-primary…) turns warm without
+ * touching the console, which stays on the dark/cyan set above.
+ *
+ * Palette: night earth (deep umber), kente gold, sunset terracotta, kente
+ * green and red, on cream ink.
+ * ══════════════════════════════════════════════════════════════════════════ */
+:root.theme-afro,
+.theme-afro {
+  --c-bg: 15 8 5;
+  --c-surface: 21 12 8;
+  --c-raised: 35 21 14;
+  --c-line: 78 52 35;
+  --c-ink: 248 236 218;
+  --c-muted: 196 172 146;
+  --c-primary: 245 166 35;
+  --c-onprimary: 30 12 4;
+  --c-success: 126 217 140;
+  --c-warning: 255 138 61;
+  --c-danger: 255 107 90;
+  --c-info: 143 190 255;
+  --c-wash: 255 255 255;
+  --afro-gold: #f5a623;
+  --afro-sun: #ffcf5a;
+  --afro-clay: #d2562b;
+  --afro-red: #c8321e;
+  --afro-green: #1f8a4c;
+  --afro-cream: #f8ecda;
+  --afro-night: #0f0805;
+  --afro-panel-a: 48 26 14;
+  --afro-panel-b: 24 12 8;
+  --afro-g1: #ffd978;
+  --afro-g2: #f5a623;
+  --afro-g3: #e8693a;
+  --afro-g4: #d2562b;
+  --afro-hero-glow: rgb(245 166 35 / 0.18);
+  background-color: rgb(var(--c-bg));
+  color: rgb(var(--c-ink));
+  color-scheme: dark;
+}
+.theme-afro .panel {
+  background-image: linear-gradient(180deg, rgb(var(--afro-panel-a)) -5%, rgb(var(--c-raised)) 55%, rgb(var(--afro-panel-b)) 108%);
+  border-color: rgb(var(--c-primary) / 0.22);
+}
+.theme-afro .card {
+  border-color: rgb(var(--c-line) / 0.6);
+}
+.theme-afro .glass {
+  background-color: rgb(var(--c-raised) / 0.72);
+  border-color: rgb(var(--c-primary) / 0.22);
+}
+.theme-afro .text-brand-gradient,
+.text-afro-gradient {
+  background-image: linear-gradient(95deg, var(--afro-g1) 0%, var(--afro-g2) 38%, var(--afro-g3) 78%, var(--afro-g4) 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.theme-afro .bg-brand-gradient,
+.bg-afro-gradient {
+  background-image: linear-gradient(135deg, var(--afro-g2), var(--afro-g3) 55%, #c8321e);
+}
+.theme-afro .pill-gradient {
+  background-image: linear-gradient(90deg, var(--afro-g1), var(--afro-g2) 90%);
+  color: rgb(var(--c-onprimary));
+}
+.theme-afro .btn-primary {
+  box-shadow: 0 10px 30px -12px rgb(var(--c-primary) / 0.6);
+}
+
+/*
+ * Light variant of the same theme: sand and cream with deepened gold, so text
+ * and buttons keep AA contrast. Defined after .theme-afro so, on <html>, it
+ * wins; the landing wrapper re-asserts .theme-afro to stay dark.
+ */
+:root.theme-afro-light,
+.theme-afro-light {
+  --c-bg: 253 247 237;
+  --c-surface: 248 239 224;
+  --c-raised: 255 252 246;
+  --c-line: 226 208 180;
+  --c-ink: 42 24 14;
+  --c-muted: 110 86 66;
+  --c-primary: 160 88 0;
+  --c-onprimary: 255 255 255;
+  --c-success: 21 110 60;
+  --c-warning: 150 68 6;
+  --c-danger: 185 28 28;
+  --c-info: 3 98 150;
+  --c-wash: 60 30 10;
+  --afro-panel-a: 255 244 222;
+  --afro-panel-b: 250 238 218;
+  --afro-g1: #b8690a;
+  --afro-g2: #a05800;
+  --afro-g3: #b8431c;
+  --afro-g4: #b02a18;
+  color-scheme: light;
+}
+
+/* Woven kente strip: blocks of gold, green, red and night over a warp of thin stripes. */
+.kente-band {
+  height: 14px;
+  background-image:
+    repeating-linear-gradient(90deg, transparent 0 18px, rgb(0 0 0 / 0.28) 18px 20px),
+    repeating-linear-gradient(
+      90deg,
+      #f5a623 0 40px,
+      #0f0805 40px 52px,
+      #1f8a4c 52px 92px,
+      #0f0805 92px 104px,
+      #c8321e 104px 144px,
+      #0f0805 144px 156px,
+      #f8ecda 156px 164px,
+      #0f0805 164px 176px
+    );
+  background-size: 176px 100%;
+  animation: kente-slide 40s linear infinite;
+}
+@keyframes kente-slide {
+  to {
+    background-position: 176px 0, 176px 0;
+  }
+}
+.kente-band-thin {
+  height: 6px;
+  animation-duration: 60s;
+}
+
+/* Bògòlanfini-inspired mud-cloth tile: crosses, dots and zigzags in one repeat. */
+.pattern-mudcloth {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='72' height='72' viewBox='0 0 72 72' fill='none' stroke='%23f8ecda' stroke-width='2' stroke-linecap='square'><path d='M6 18h12M12 12v12'/><path d='M48 54h12M54 48v12'/><path d='M0 42l6-6 6 6 6-6 6 6'/><path d='M42 12l6-6 6 6 6-6 6 6'/><circle cx='54' cy='30' r='2.5' fill='%23f8ecda' stroke='none'/><circle cx='18' cy='60' r='2.5' fill='%23f8ecda' stroke='none'/></svg>");
+  background-size: 72px 72px;
+}
+/* Ndebele-style triangle border for cards and sections. */
+.pattern-zigzag {
+  height: 16px;
+  background:
+    conic-gradient(from -45deg at bottom, transparent 90deg, #f5a623 0 135deg, transparent 0) 0 0 / 32px 16px,
+    conic-gradient(from 135deg at top, transparent 90deg, #c8321e 0 135deg, transparent 0) 16px 0 / 32px 16px;
+  opacity: 0.9;
+}
+
+/* Arched window, after Sahelian doorways. */
+.arch {
+  border-radius: 9999px 9999px 28px 28px;
+}
+
+/* Scroll reveal. Hidden only when scripting is on, so no-JS visitors see everything. */
+@media (scripting: enabled) {
+  .reveal {
+    opacity: 0;
+    transform: translate3d(0, 32px, 0) scale(0.98);
+    transition:
+      opacity 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--reveal-delay, 0ms),
+      transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--reveal-delay, 0ms);
+    will-change: opacity, transform;
+  }
+  .reveal-left {
+    transform: translate3d(-40px, 0, 0);
+  }
+  .reveal-right {
+    transform: translate3d(40px, 0, 0);
+  }
+  .reveal.is-in {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes float-y {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-14px);
+  }
+}
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes spin-slow-rev {
+  to {
+    transform: rotate(-360deg);
+  }
+}
+@keyframes sun-breathe {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.95;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+@keyframes draw-line {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-1.2deg);
+  }
+  50% {
+    transform: rotate(1.2deg);
+  }
+}
+@keyframes shine-sweep {
+  0% {
+    transform: translateX(-120%) skewX(-18deg);
+  }
+  60%,
+  100% {
+    transform: translateX(260%) skewX(-18deg);
+  }
+}
+.float-y {
+  animation: float-y 7s ease-in-out infinite;
+}
+.spin-slow {
+  animation: spin-slow 90s linear infinite;
+}
+.spin-slow-rev {
+  animation: spin-slow-rev 120s linear infinite;
+}
+.sun-breathe {
+  animation: sun-breathe 6s ease-in-out infinite;
+}
+.sway {
+  transform-origin: 50% 100%;
+  animation: sway 9s ease-in-out infinite;
+}
+.shine::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.28), transparent);
+  transform: translateX(-120%) skewX(-18deg);
+  animation: shine-sweep 5s ease-in-out infinite;
+  pointer-events: none;
+}
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.25s ease-out, border-color 0.25s, background-color 0.25s;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal-left,
+  .reveal-right {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  .kente-band,
+  .float-y,
+  .spin-slow,
+  .spin-slow-rev,
+  .sun-breathe,
+  .sway,
+  .shine::after {
+    animation: none !important;
+  }
+}
+
+/* The hero caption that names the passing guardian. */
+@keyframes caption-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+.guardian-caption {
+  animation: caption-in 0.7s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  border-color: rgb(245 166 35 / 0.3);
+}
+@media (prefers-reduced-motion: reduce) {
+  .guardian-caption {
+    animation: none;
+  }
+}
+
+/* Logo lock-ups for the African theme: cream wordmark on dark, umber on light. */
+.logo-on-light {
+  display: none;
+}
+.theme-afro-light .logo-on-dark {
+  display: none;
+}
+.theme-afro-light .logo-on-light {
+  display: block;
+}
+/* The landing page stays dark whatever the visitor chose for the app. */
+.theme-afro-night .logo-on-dark {
+  display: block;
+}
+.theme-afro-night .logo-on-light {
+  display: none;
+}

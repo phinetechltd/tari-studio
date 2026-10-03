@@ -1,0 +1,253 @@
+// ═══════════════════════════════════════════════════════════════════════
+//  Project Management & Issues Tracking
+//  Supports multiple projects/systems with centralized issue tracking
+// ═══════════════════════════════════════════════════════════════════════
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  PROJECTS & SYSTEMS
+// ═══════════════════════════════════════════════════════════════════════
+
+/// A project or system being monitored
+/// Examples: Agency Platform, IntelliCash Mobile, IntelliCash Admin, etc.
+model Project {
+  id             String   @id @default(cuid())
+  /// Project name (e.g., "Agency Platform", "IntelliCash Mobile")
+  name           String
+  /// Unique slug for URL-friendly reference
+  slug           String   @unique
+  /// Short description
+  description    String?
+  /// Project type: web | mobile | backend | infrastructure | other
+  type           String   @default("other")
+  /// Owner/organization this project belongs to
+  ownerId        String?
+  /// Project status: active | maintenance | archived
+  status         String   @default("active")
+  /// Base URL for the project (e.g., http://localhost:3400)
+  baseUrl        String?
+  /// Health check endpoint (e.g., /api/health)
+  healthEndpoint String?
+  /// Cron expression for automated health checks (e.g., "*/5 * * * *")
+  healthCheckCron String?
+  /// Last health check timestamp
+  lastHealthCheck DateTime?
+  /// Last known health status: healthy | degraded | down | unknown
+  lastHealthStatus String @default("unknown")
+  /// When the project was created
+  createdAt      DateTime @default(now())
+  /// When the project was last updated
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  issues         Issue[]
+  healthChecks   HealthCheck[]
+  integrations   ProjectIntegration[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([type])
+}
+
+/// Integration with external systems (LinkedIn, GitHub, etc.)
+model ProjectIntegration {
+  id          String   @id @default(cuid())
+  projectId   String
+  /// Integration type: github | linkedin | telegram | webhook | other
+  type        String
+  /// Integration name (e.g., "GitHub Repo", "LinkedIn Page")
+  name        String
+  /// Configuration data (encrypted as needed)
+  config      Json
+  /// Whether this integration is active
+  enabled     Boolean  @default(true)
+  /// Last sync timestamp
+  lastSyncedAt DateTime?
+  /// Error message from last sync (if any)
+  lastError   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  project     Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([type])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  ISSUES & BUGS
+// ═══════════════════════════════════════════════════════════════════════
+
+/// An issue, bug, or task tracking item
+model Issue {
+  id             String   @id @default(cuid())
+  /// Issue reference number (e.g., "BUG-0001", "ISSUE-0001")
+  issueNumber    String   @unique
+  /// The project this issue belongs to
+  projectId      String
+  /// Issue title (short summary)
+  title          String
+  /// Detailed description
+  description    String?
+  /// Issue type: bug | feature | improvement | task | incident
+  type           String   @default("bug")
+  /// Priority level: low | medium | high | critical | urgent
+  priority       String   @default("medium")
+  /// Current status: open | in_progress | in_review | resolved | closed | wont_fix
+  status         String   @default("open")
+  /// Severity: info | minor | major | critical | blocker
+  severity       String   @default("major")
+  /// Who reported the issue
+  reporterId     String?
+  /// Who is currently assigned
+  assigneeId     String?
+  /// Who resolved the issue (if applicable)
+  resolvedById   String?
+  /// When the issue was resolved
+  resolvedAt     DateTime?
+  /// Root cause analysis or notes
+  rootCause      String?
+  /// Resolution notes
+  resolution     String?
+  /// Environment where the issue occurred: production | staging | development | unknown
+  environment    String   @default("unknown")
+  /// Steps to reproduce
+  stepsToReproduce String?
+  /// Expected behavior
+  expectedBehavior String?
+  /// Actual behavior observed
+  actualBehavior String?
+  /// Attachments (screenshots, logs) as URLs
+  attachments     String[] @default([])
+  /// Tags for categorization
+  tags           String[] @default([])
+  /// Links to related issues
+  relatedIssueIds String[] @default([])
+  /// History of status changes
+  history        IssueHistory[]
+  /// When the issue was created
+  createdAt      DateTime @default(now())
+  /// When the issue was last updated
+  updatedAt      DateTime @updatedAt
+
+  // Relations
+  project        Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments       IssueComment[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([priority])
+  @@index([assigneeId])
+  @@index([createdAt])
+  @@index([projectId, status, priority])
+}
+
+/// Comment on an issue
+model IssueComment {
+  id        String   @id @default(cuid())
+  issueId   String
+  authorId  String
+  body      String
+  /// Attachment URLs
+  attachments     String[] @default([])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  issue     Issue  @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([authorId])
+  @@index([issueId, createdAt])
+}
+
+/// History of status changes and important events
+model IssueHistory {
+  id        String   @id @default(cuid())
+  issueId   String
+  action    String   // created | status_changed | assigned | priority_changed | comment_added | etc.
+  from      String?  // Previous value (for status/priority changes)
+  to        String?  // New value
+  note      String?  // Additional context
+  authorId  String?
+  createdAt DateTime @default(now())
+
+  issue     Issue @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([issueId, createdAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  HEALTH CHECKS & MONITORING
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Automated health check results
+model HealthCheck {
+  id        String   @id @default(cuid())
+  projectId String
+  /// Status: healthy | degraded | down | unknown
+  status    String
+  /// HTTP status code if applicable
+  httpStatus Int?
+  /// Response time in milliseconds
+  responseTimeMs Int?
+  /// Error message if any
+  errorMessage  String?
+  /// Check details (JSON)
+  details   Json?
+  /// When the check was performed
+  checkedAt DateTime @default(now())
+
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([checkedAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  DASHBOARD & ANALYTICS
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Dashboard widget configuration
+model DashboardWidget {
+  id          String   @id @default(cuid())
+  /// Widget name: issue_summary | health_overview | recent_activity | priority_breakdown
+  widgetType  String
+  /// Display title
+  title       String
+  /// Filter criteria (JSON)
+  filters     Json     @default("{}")
+  /// Sort order in dashboard
+  sortOrder   Int      @default(0)
+  /// Whether widget is visible
+  visible     Boolean  @default(true)
+  /// Widget size: small | medium | large | full
+  size        String   @default("medium")
+  userDashboard UserDashboard? @relation(fields: [userDashboardId], references: [id], onDelete: Cascade)
+  userDashboardId String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([widgetType])
+}
+
+/// Dashboard customizations per user
+model UserDashboard {
+  id            String        @id @default(cuid())
+  userId        String        @unique
+  dashboardName String        @default("Default")
+  widgets       DashboardWidget[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId])
+}

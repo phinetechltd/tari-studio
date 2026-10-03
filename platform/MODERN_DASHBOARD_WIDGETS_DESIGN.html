@@ -1,0 +1,1231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Modern Dashboard Widgets — Design Artifact</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0c0e13;
+  --surface: #14171e;
+  --raised: #1b1f28;
+  --line: #2c323f;
+  --ink: #ececf4;
+  --muted: #969ead;
+  --primary: #818cf8;
+  --primary-hover: #6366f1;
+  --onprimary: #0c0e13;
+  --success: #4ade80;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --info: #38bdf8;
+  --radius: 10px;
+  --radius-sm: 6px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.4), 0 1px 2px rgba(0,0,0,0.3);
+  --shadow-hover: 0 4px 16px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3);
+  --transition: 120ms ease;
+  --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  min-height: 100vh;
+  padding: 32px;
+}
+
+/* Section Header */
+.page-header {
+  margin-bottom: 28px;
+}
+
+.page-title {
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+
+.page-subtitle {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* Widget Grid */
+.widget-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.widget-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+/* Widget Card Base */
+.widget {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+  transition: all var(--transition);
+  cursor: default;
+}
+
+.widget:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-hover);
+}
+
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.widget-title {
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.widget-icon {
+  width: 14px;
+  height: 14px;
+  opacity: 0.7;
+}
+
+.widget-menu {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--transition);
+}
+
+.widget-menu:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.widget-body {
+  padding: 18px;
+}
+
+/* Widget 1: Metric Card */
+.metric-value {
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.metric-label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.metric-trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 8px;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.metric-trend.up { background: rgba(74, 222, 128, 0.1); color: var(--success); }
+.metric-trend.down { background: rgba(248, 113, 113, 0.1); color: var(--danger); }
+.metric-trend.stable { background: rgba(251, 191, 36, 0.1); color: var(--warning); }
+
+.metric-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+}
+
+/* Mini sparkline placeholder */
+.sparkline {
+  height: 32px;
+  margin-top: 12px;
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+}
+
+.spark-bar {
+  flex: 1;
+  border-radius: 2px 2px 0 0;
+  background: var(--primary);
+  opacity: 0.4;
+  transition: opacity var(--transition);
+  min-height: 4px;
+}
+
+.spark-bar:hover { opacity: 0.8; }
+.spark-bar.high { opacity: 0.9; }
+
+/* Widget 2: Chart Widget */
+.chart-area {
+  width: 100%;
+  height: 180px;
+  position: relative;
+  margin-top: 4px;
+}
+
+.chart-bars {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 100%;
+  padding: 0 4px;
+}
+
+.chart-bar {
+  flex: 1;
+  border-radius: 3px 3px 0 0;
+  background: linear-gradient(180deg, var(--primary) 0%, rgba(129, 140, 248, 0.2) 100%);
+  min-height: 8px;
+  transition: all var(--transition);
+  position: relative;
+  cursor: pointer;
+}
+
+.chart-bar:hover {
+  background: linear-gradient(180deg, var(--primary-hover) 0%, rgba(99, 102, 241, 0.2) 100%);
+  transform: scaleY(1.02);
+  transform-origin: bottom;
+}
+
+.chart-bar-label {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+/* Widget 3: Activity Feed */
+.activity-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.activity-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.activity-item:last-child { border-bottom: none; padding-bottom: 0; }
+
+.activity-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-top: 5px;
+  flex-shrink: 0;
+}
+
+.activity-dot.purple { background: var(--primary); }
+.activity-dot.blue { background: var(--info); }
+.activity-dot.green { background: var(--success); }
+.activity-dot.orange { background: var(--warning); }
+
+.activity-text {
+  font-size: 13px;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.activity-text strong { font-weight: 600; }
+
+.activity-time {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+
+/* Widget 4: Quick Actions */
+.quick-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.quick-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 12px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition);
+  font-family: var(--font);
+  color: var(--ink);
+}
+
+.quick-action-btn:hover {
+  border-color: var(--primary);
+  background: rgba(129, 140, 248, 0.05);
+  transform: translateY(-1px);
+}
+
+.quick-action-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.quick-action-icon.purple { background: rgba(129, 140, 248, 0.15); }
+.quick-action-icon.blue { background: rgba(56, 189, 248, 0.15); }
+.quick-action-icon.green { background: rgba(74, 222, 128, 0.15); }
+.quick-action-icon.orange { background: rgba(251, 191, 36, 0.15); }
+
+.quick-action-label {
+  font-size: 12px;
+  font-weight: 500;
+  text-align: center;
+}
+
+/* Widget 5: Recent Items */
+.recent-items-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.recent-item:last-child { border-bottom: none; }
+
+.recent-item-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.recent-item-avatar.c1 { background: rgba(129, 140, 248, 0.15); color: var(--primary); }
+.recent-item-avatar.c2 { background: rgba(56, 189, 248, 0.15); color: var(--info); }
+.recent-item-avatar.c3 { background: rgba(74, 222, 128, 0.15); color: var(--success); }
+
+.recent-item-info { flex: 1; min-width: 0; }
+
+.recent-item-title {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.recent-item-meta {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.recent-item-badge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 7px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.badge-new { background: rgba(129, 140, 248, 0.12); color: var(--primary); }
+.badge-done { background: rgba(74, 222, 128, 0.12); color: var(--success); }
+.badge-pending { background: rgba(251, 191, 36, 0.12); color: var(--warning); }
+
+/* Widget 6: Team Status */
+.team-status-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.team-status-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.team-status-item:last-child { border-bottom: none; }
+
+.status-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.status-avatar.s1 { background: #818cf8; color: white; }
+.status-avatar.s2 { background: #38bdf8; color: white; }
+.status-avatar.s3 { background: #4ade80; color: #0c0e13; }
+.status-avatar.s4 { background: #fbbf24; color: #0c0e13; }
+
+.status-info { flex: 1; min-width: 0; }
+
+.status-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.status-role {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.status-indicator {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.status-indicator.online { background: var(--success); box-shadow: 0 0 6px var(--success); }
+.status-indicator.away { background: var(--warning); }
+.status-indicator.offline { background: var(--line); }
+
+/* Widget 7: Campaign Performance */
+.campaign-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.campaign-row:last-child { border-bottom: none; }
+
+.campaign-name {
+  font-size: 13px;
+  font-weight: 500;
+  flex: 1;
+}
+
+.campaign-metric {
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--mono);
+}
+
+.campaign-metric.positive { color: var(--success); }
+.campaign-metric.neutral { color: var(--ink); }
+
+.campaign-bar {
+  width: 60px;
+  height: 4px;
+  background: var(--raised);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.campaign-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.campaign-bar-fill.high { background: var(--success); }
+.campaign-bar-fill.medium { background: var(--warning); }
+.campaign-bar-fill.low { background: var(--danger); }
+
+/* Widget 8: Content Pipeline */
+.pipeline-stages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 0;
+}
+
+.pipeline-stage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pipeline-stage-info {
+  flex: 1;
+}
+
+.pipeline-stage-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.pipeline-stage-count {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.pipeline-stage-bar {
+  width: 80px;
+  height: 6px;
+  background: var(--raised);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.pipeline-stage-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.pipeline-stage-fill.purple { background: var(--primary); }
+.pipeline-stage-fill.blue { background: var(--info); }
+.pipeline-stage-fill.orange { background: var(--warning); }
+.pipeline-stage-fill.green { background: var(--success); }
+
+/* Empty State Widget */
+.empty-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+}
+
+.empty-widget-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+  font-size: 18px;
+  color: var(--muted);
+}
+
+.empty-widget-title {
+  font-size: 13px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.empty-widget-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Loading Skeleton */
+.skeleton {
+  background: var(--raised);
+  border-radius: 4px;
+  animation: shimmer 1.5s infinite;
+  background: linear-gradient(90deg, var(--raised) 25%, var(--line) 50%, var(--raised) 75%);
+  background-size: 200% 100%;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Error State */
+.error-widget {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  text-align: center;
+  gap: 8px;
+}
+
+.error-widget-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(248, 113, 113, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--danger);
+  font-size: 16px;
+}
+
+.error-widget-title {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--danger);
+}
+
+.error-widget-desc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.error-widget-retry {
+  margin-top: 8px;
+  padding: 6px 14px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: all var(--transition);
+}
+
+.error-widget-retry:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* Tweaks */
+.tweaks-panel {
+  position: fixed;
+  bottom: 16px;
+  right: 16px;
+  z-index: 9999;
+}
+
+.tweaks-toggle {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--onprimary);
+  border: none;
+  cursor: pointer;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-hover);
+  transition: all var(--transition);
+}
+
+.tweaks-toggle:hover { transform: scale(1.05); }
+
+.tweaks-drawer {
+  position: fixed;
+  bottom: 60px;
+  right: 16px;
+  width: 240px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px;
+  box-shadow: var(--shadow-hover);
+  z-index: 9998;
+}
+
+.tweaks-section { margin-bottom: 12px; }
+
+.tweaks-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
+
+.tweaks-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 0;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.tweaks-option input[type="radio"] { accent-color: var(--primary); }
+
+.tweaks-divider {
+  height: 1px;
+  background: var(--line);
+  margin: 10px 0;
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .widget-grid { grid-template-columns: repeat(2, 1fr); }
+  .widget-grid-2 { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 768px) {
+  .widget-grid { grid-template-columns: 1fr; }
+  body { padding: 16px; }
+}
+
+/* Selection */
+::selection { background: rgba(129, 140, 248, 0.3); }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <h1 class="page-title">Dashboard Widgets — Design System</h1>
+  <p class="page-subtitle">8 widget types · Modern SaaS aesthetic · Dark mode primary · Interactive Tweaks panel</p>
+</div>
+
+<!-- Row 1: Metric Cards (4-up) -->
+<div class="widget-grid">
+  <!-- Total Content -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+        Total Content
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="metric-value">147</div>
+      <div class="metric-label">All time</div>
+      <div class="metric-trend up">↑ 12% this month</div>
+      <div class="sparkline" id="spark1"></div>
+    </div>
+  </div>
+
+  <!-- Published -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+        Published
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="metric-value">89</div>
+      <div class="metric-label">Live content</div>
+      <div class="metric-trend up">↑ 8% this week</div>
+      <div class="sparkline" id="spark2"></div>
+    </div>
+  </div>
+
+  <!-- Approval Rate -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+        Approval Rate
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="metric-value">94%</div>
+      <div class="metric-label">This quarter</div>
+      <div class="metric-trend stable">→ On target</div>
+      <div class="sparkline" id="spark3"></div>
+    </div>
+  </div>
+
+  <!-- Active Team -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team Active
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="metric-value">6</div>
+      <div class="metric-label">Of 8 members online</div>
+      <div class="metric-trend up">↑ All present</div>
+      <div class="sparkline" id="spark4"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 2: Chart + Activity Feed -->
+<div class="widget-grid-2">
+  <!-- Content Performance Chart -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Content Performance
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div style="display: flex; justify-content: space-between; margin-bottom: 12px;">
+        <span style="font-size: 12px; color: var(--muted);">Last 7 days</span>
+        <span style="font-size: 12px; color: var(--muted);">Views: 2.4k</span>
+      </div>
+      <div class="chart-area">
+        <div class="chart-bars" id="chartBars"></div>
+      </div>
+      <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+        <span style="font-size: 11px; color: var(--muted);">Mon</span>
+        <span style="font-size: 11px; color: var(--muted);">Tue</span>
+        <span style="font-size: 11px; color: var(--muted);">Wed</span>
+        <span style="font-size: 11px; color: var(--muted);">Thu</span>
+        <span style="font-size: 11px; color: var(--muted);">Fri</span>
+        <span style="font-size: 11px; color: var(--muted);">Sat</span>
+        <span style="font-size: 11px; color: var(--muted);">Sun</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Activity Feed -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        Recent Activity
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="activity-list">
+        <div class="activity-item">
+          <div class="activity-dot purple"></div>
+          <div>
+            <div class="activity-text"><strong>Alice Kim</strong> published "GeForce K3 Launch Post"</div>
+            <div class="activity-time">12 min ago</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-dot blue"></div>
+          <div>
+            <div class="activity-text"><strong>Marcus Reed</strong> submitted draft for review</div>
+            <div class="activity-time">45 min ago</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-dot green"></div>
+          <div>
+            <div class="activity-text"><strong>Sarah Lin</strong> approved "Benchmark Report"</div>
+            <div class="activity-time">2 hours ago</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-dot orange"></div>
+          <div>
+            <div class="activity-text">New team member <strong>Jay O.</strong> joined Demo Agency</div>
+            <div class="activity-time">5 hours ago</div>
+          </div>
+        </div>
+        <div class="activity-item">
+          <div class="activity-dot purple"></div>
+          <div>
+            <div class="activity-text"><strong>System</strong> Content auto-published to Twitter/X</div>
+            <div class="activity-time">8 hours ago</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 3: Quick Actions + Recent Items + Team Status + Campaigns -->
+<div class="widget-grid-2">
+  <!-- Quick Actions -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Quick Actions
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="quick-actions-grid">
+        <button class="quick-action-btn">
+          <div class="quick-action-icon purple">＋</div>
+          <span class="quick-action-label">New Content</span>
+        </button>
+        <button class="quick-action-btn">
+          <div class="quick-action-icon blue">👤</div>
+          <span class="quick-action-label">Add Member</span>
+        </button>
+        <button class="quick-action-btn">
+          <div class="quick-action-icon green">📊</div>
+          <span class="quick-action-label">New Campaign</span>
+        </button>
+        <button class="quick-action-btn">
+          <div class="quick-action-icon orange">⚙️</div>
+          <span class="quick-action-label">Settings</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Recent Items -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Recent Items
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="recent-items-list">
+        <div class="recent-item">
+          <div class="recent-item-avatar c1">P</div>
+          <div class="recent-item-info">
+            <div class="recent-item-title">Product Launch Post</div>
+            <div class="recent-item-meta">Social · Just now</div>
+          </div>
+          <span class="recent-item-badge badge-new">New</span>
+        </div>
+        <div class="recent-item">
+          <div class="recent-item-avatar c2">B</div>
+          <div class="recent-item-info">
+            <div class="recent-item-title">Benchmark Report v2.1</div>
+            <div class="recent-item-meta">Article · 2h ago</div>
+          </div>
+          <span class="recent-item-badge badge-done">Done</span>
+        </div>
+        <div class="recent-item">
+          <div class="recent-item-avatar c3">A</div>
+          <div class="recent-item-info">
+            <div class="recent-item-title">API Quick Start Guide</div>
+            <div class="recent-item-meta">Docs · 5h ago</div>
+          </div>
+          <span class="recent-item-badge badge-pending">Review</span>
+        </div>
+        <div class="recent-item">
+          <div class="recent-item-avatar c1">V</div>
+          <div class="recent-item-info">
+            <div class="recent-item-title">K3 Architecture Video Script</div>
+            <div class="recent-item-meta">Script · 1d ago</div>
+          </div>
+          <span class="recent-item-badge badge-pending">Draft</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 4: Team Status + Campaign Performance + Content Pipeline -->
+<div class="widget-grid-2">
+  <!-- Team Status -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Team Status
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="team-status-list">
+        <div class="team-status-item">
+          <div class="status-avatar s1">AK</div>
+          <div class="status-info">
+            <div class="status-name">Alice Kim</div>
+            <div class="status-role">Content Lead</div>
+          </div>
+          <div class="status-indicator online"></div>
+        </div>
+        <div class="team-status-item">
+          <div class="status-avatar s2">MR</div>
+          <div class="status-info">
+            <div class="status-name">Marcus Reed</div>
+            <div class="status-role">Content Creator</div>
+          </div>
+          <div class="status-indicator online"></div>
+        </div>
+        <div class="team-status-item">
+          <div class="status-avatar s3">SL</div>
+          <div class="status-info">
+            <div class="status-name">Sarah Lin</div>
+            <div class="status-role">Reviewer</div>
+          </div>
+          <div class="status-indicator away"></div>
+        </div>
+        <div class="team-status-item">
+          <div class="status-avatar s4">JO</div>
+          <div class="status-info">
+            <div class="status-name">Jay Okafor</div>
+            <div class="status-role">New Member</div>
+          </div>
+          <div class="status-indicator offline"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Campaign Performance -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        Campaign Performance
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="campaign-row">
+        <span class="campaign-name">Launch Week</span>
+        <span class="campaign-metric positive">+23%</span>
+        <div class="campaign-bar"><div class="campaign-bar-fill high" style="width: 85%"></div></div>
+      </div>
+      <div class="campaign-row">
+        <span class="campaign-name">Social Push</span>
+        <span class="campaign-metric positive">+12%</span>
+        <div class="campaign-bar"><div class="campaign-bar-fill high" style="width: 62%"></div></div>
+      </div>
+      <div class="campaign-row">
+        <span class="campaign-name">Email Blast</span>
+        <span class="campaign-metric neutral">+4%</span>
+        <div class="campaign-bar"><div class="campaign-bar-fill medium" style="width: 40%"></div></div>
+      </div>
+      <div class="campaign-row">
+        <span class="campaign-name">Retargeting</span>
+        <span class="campaign-metric positive">+18%</span>
+        <div class="campaign-bar"><div class="campaign-bar-fill high" style="width: 71%"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Row 5: Content Pipeline -->
+<div class="widget-grid-2">
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+        Content Pipeline
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="pipeline-stages">
+        <div class="pipeline-stage">
+          <div class="pipeline-stage-info">
+            <div class="pipeline-stage-label">Draft</div>
+            <div class="pipeline-stage-count">3 items</div>
+          </div>
+          <div class="pipeline-stage-bar"><div class="pipeline-stage-fill purple" style="width: 15%"></div></div>
+        </div>
+        <div class="pipeline-stage">
+          <div class="pipeline-stage-info">
+            <div class="pipeline-stage-label">In Review</div>
+            <div class="pipeline-stage-count">4 items</div>
+          </div>
+          <div class="pipeline-stage-bar"><div class="pipeline-stage-fill blue" style="width: 20%"></div></div>
+        </div>
+        <div class="pipeline-stage">
+          <div class="pipeline-stage-info">
+            <div class="pipeline-stage-label">Approved</div>
+            <div class="pipeline-stage-count">5 items</div>
+          </div>
+          <div class="pipeline-stage-bar"><div class="pipeline-stage-fill green" style="width: 25%"></div></div>
+        </div>
+        <div class="pipeline-stage">
+          <div class="pipeline-stage-info">
+            <div class="pipeline-stage-label">Published</div>
+            <div class="pipeline-stage-count">8 items</div>
+          </div>
+          <div class="pipeline-stage-bar"><div class="pipeline-stage-fill orange" style="width: 40%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Empty State Example -->
+  <div class="widget">
+    <div class="widget-header">
+      <span class="widget-title">
+        <svg class="widget-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        No Data Example
+      </span>
+      <button class="widget-menu">⋯</button>
+    </div>
+    <div class="widget-body">
+      <div class="empty-widget">
+        <div class="empty-widget-icon">📭</div>
+        <div class="empty-widget-title">No recent activity</div>
+        <div class="empty-widget-desc">Content items will appear here when created</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Error State Example -->
+<div class="widget-grid-2" style="margin-bottom: 0;">
+  <div class="widget">
+    <div class="widget-body">
+      <div class="error-widget">
+        <div class="error-widget-icon">⚠</div>
+        <div class="error-widget-title">API Error</div>
+        <div class="error-widget-desc">Could not load campaign data</div>
+        <button class="error-widget-retry">Retry</button>
+      </div>
+    </div>
+  </div>
+  <div class="widget">
+    <div class="widget-body">
+      <div class="error-widget">
+        <div class="error-widget-icon">⚠</div>
+        <div class="error-widget-title">Loading...</div>
+        <div class="error-widget-desc">Fetching content items</div>
+        <div style="display: flex; gap: 4px; margin-top: 8px;">
+          <div class="skeleton" style="width: 60px; height: 6px;"></div>
+          <div class="skeleton" style="width: 40px; height: 6px;"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tweaks -->
+<div class="tweaks-panel">
+  <button class="tweaks-toggle" onclick="document.querySelector('.tweaks-drawer').classList.toggle('hidden')">🎨</button>
+  <div class="tweaks-drawer hidden" id="tweaksDrawer">
+    <div class="tweaks-section">
+      <div class="tweaks-label">Accent Color</div>
+      <label class="tweaks-option"><input type="radio" name="accent" checked onchange="setAccent('#818cf8')"> Indigo</label>
+      <label class="tweaks-option"><input type="radio" name="accent" onchange="setAccent('#a78bfa')"> Violet</label>
+      <label class="tweaks-option"><input type="radio" name="accent" onchange="setAccent('#38bdf8')"> Blue</label>
+      <label class="tweaks-option"><input type="radio" name="accent" onchange="setAccent('#4ade80')"> Emerald</label>
+      <label class="tweaks-option"><input type="radio" name="accent" onchange="setAccent('#f87171')"> Rose</label>
+    </div>
+    <div class="tweaks-divider"></div>
+    <div class="tweaks-section">
+      <div class="tweaks-label">Widget Density</div>
+      <label class="tweaks-option"><input type="radio" name="density" checked onchange="setDensity('comfortable')"> Comfortable</label>
+      <label class="tweaks-option"><input type="radio" name="density" onchange="setDensity('compact')"> Compact</label>
+    </div>
+    <div class="tweaks-divider"></div>
+    <div class="tweaks-section">
+      <div class="tweaks-label">Theme</div>
+      <label class="tweaks-option"><input type="radio" name="theme" checked onchange="setTheme('dark')"> Dark</label>
+      <label class="tweaks-option"><input type="radio" name="theme" onchange="setTheme('light')"> Light</label>
+    </div>
+  </div>
+</div>
+
+<script>
+// Sparklines
+function renderSpark(id, heights) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = heights.map(h => `<div class="spark-bar ${h > 60 ? 'high' : ''}" style="height: ${h}%"></div>`).join('');
+}
+renderSpark('spark1', [30,45,35,60,50,70,55]);
+renderSpark('spark2', [40,55,45,70,65,80,60]);
+renderSpark('spark3', [85,80,90,88,92,95,94]);
+renderSpark('spark4', [50,60,55,70,80,75,85]);
+
+// Chart bars
+(function() {
+  const el = document.getElementById('chartBars');
+  const heights = [40, 55, 38, 72, 60, 85, 48];
+  const labels = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  el.innerHTML = heights.map((h, i) =>
+    `<div class="chart-bar" style="height: ${h}%" title="${labels[i]}: ${h}%"></div>`
+  ).join('');
+})();
+
+function setAccent(color) {
+  const root = document.documentElement;
+  root.style.setProperty('--primary', color);
+  // Derive hover
+  root.style.setProperty('--primary-hover', color + 'cc');
+  // Derive surface accent
+  root.style.setProperty('--onprimary', '#0c0e13');
+}
+
+function setDensity(d) {
+  const root = document.documentElement;
+  if (d === 'compact') {
+    root.style.setProperty('--radius', '6px');
+    root.style.setProperty('--radius-sm', '4px');
+    document.querySelectorAll('.widget-body').forEach(el => el.style.padding = '12px');
+    document.querySelectorAll('.widget-header').forEach(el => el.style.padding = '10px 14px');
+    document.querySelectorAll('.metric-value').forEach(el => el.style.fontSize = '28px');
+  } else {
+    root.style.setProperty('--radius', '10px');
+    root.style.setProperty('--radius-sm', '6px');
+    document.querySelectorAll('.widget-body').forEach(el => el.style.padding = '18px');
+    document.querySelectorAll('.widget-header').forEach(el => el.style.padding = '14px 18px');
+    document.querySelectorAll('.metric-value').forEach(el => el.style.fontSize = '36px');
+  }
+}
+
+function setTheme(t) {
+  const root = document.documentElement;
+  if (t === 'light') {
+    root.style.setProperty('--bg', '#f8f9fb');
+    root.style.setProperty('--surface', '#ffffff');
+    root.style.setProperty('--raised', '#f0f2f5');
+    root.style.setProperty('--line', '#e2e5eb');
+    root.style.setProperty('--ink', '#111827');
+    root.style.setProperty('--muted', '#64748b');
+  } else {
+    root.style.setProperty('--bg', '#0c0e13');
+    root.style.setProperty('--surface', '#14171e');
+    root.style.setProperty('--raised', '#1b1f28');
+    root.style.setProperty('--line', '#2c323f');
+    root.style.setProperty('--ink', '#ececf4');
+    root.style.setProperty('--muted', '#969ead');
+  }
+}
+</script>
+
+</body>
+</html>

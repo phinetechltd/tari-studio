@@ -1,0 +1,1677 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A tenant: one agency. Everything else hangs off this.
+model Organization {
+  id               String               @id @default(cuid())
+  name             String
+  slug             String               @unique
+  /// ACTIVE | SUSPENDED — a suspended tenant loses access even with a live token
+  status           String               @default("ACTIVE")
+  /// TRIAL | STARTER | GROWTH | PRO | INTERNAL — see src/lib/limits.ts
+  plan             String               @default("TRIAL")
+  /// Per-organisation overrides of the plan's limits, e.g. {"brands": 12}
+  limitsOverride   Json?
+  /// IANA zone. Timestamps are stored UTC and shown in this zone.
+  timezone         String               @default("Africa/Nairobi")
+  /// The getting-started wizard: {"seenAt": ISO, "dismissed": bool, "skipped": [step]} (src/server/setup.ts)
+  setupState       Json?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  aiUsage          AiUsage[]
+  auditLogs        AuditLog[]
+  brands           Brand[]
+  campaigns        Campaign[]
+  catalogueItems   CatalogueItem[]
+  submissions      ContentSubmission[]
+  tasks            ContentTask[]
+  documentCounters DocumentCounter[]
+  generatedAssets  GeneratedAsset[]
+  invites          Invite[]
+  memberships      Membership[]
+  notifications    Notification[]
+  modules          OrganizationModule[]
+  contentPosts     Post[]
+  settings         Setting[]
+  channels         SocialChannel[]
+  posts            SocialPost[]
+  links            TrackedLink[]
+  webhookEvents    WebhookEvent[]
+  orders           Order[]
+  paymentIntents   PaymentIntent[]
+  tokenBalances    TokenBalance[]
+  tokenLedger      TokenLedger[]
+  studioThreads    StudioThread[]
+  studioMessages   StudioMessage[]
+  contacts         Contact[]
+  conversations    Conversation[]
+  messages         Message[]
+  automations      Automation[]
+  automationRuns   AutomationRun[]
+  subscription     Subscription?
+  characters       Character[]
+}
+
+/// The licensing gate: a module the tenant has bought. Read on every request,
+/// never baked into a token, so revoking takes effect immediately.
+model OrganizationModule {
+  id             String       @id @default(cuid())
+  organizationId String
+  moduleKey      String
+  enabled        Boolean      @default(true)
+  enabledAt      DateTime     @default(now())
+  enabledById    String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, moduleKey])
+  @@index([organizationId])
+}
+
+/// A person. Belongs to organisations through `Membership`, so a freelance
+/// designer serving several agencies is one account, not several.
+model User {
+  id                      String                   @id @default(cuid())
+  /// Stored lower-cased; normalised at the boundary (src/lib/identity.ts)
+  email                   String                   @unique
+  name                    String
+  passwordHash            String
+  /// ACTIVE | SUSPENDED
+  status                  String                   @default("ACTIVE")
+  /// Platform staff. Not a membership role: it is not granted inside an org.
+  isPlatformAdmin         Boolean                  @default(false)
+  /// Bumped to revoke every session for this user (password change, "sign out everywhere")
+  tokenVersion            Int                      @default(0)
+  /// The organisation the user is currently working in
+  activeOrganizationId    String?
+  totpCipher              String?
+  totpIv                  String?
+  totpTag                 String?
+  totpEnabledAt           DateTime?
+  /// Last accepted 30 s counter — a code from an earlier or equal step is a replay
+  totpLastCounter         Int?
+  lastLoginAt             DateTime?
+  /// For SMS notifications, canonical 2547XXXXXXXX / 2541XXXXXXXX (src/lib/phone.ts)
+  phone                   String?
+  /// First-use tips in the console; the person can switch them off
+  hintsEnabled            Boolean                  @default(true)
+  /// Tips already dismissed with "Got it"
+  dismissedHints          String[]                 @default([])
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  notificationPreferences NotificationPreference[]
+  createdBrands           Brand[]                  @relation("BrandCreator")
+  createdCampaigns        Campaign[]               @relation("CampaignCreator")
+  comments                Comment[]
+  contentSubmissions      ContentSubmission[]      @relation("UserContentSubmissions")
+  assignedTasks           ContentTask[]            @relation("TaskAssignee")
+  createdTasks            ContentTask[]            @relation("TaskCreator")
+  createdAssets           GeneratedAsset[]         @relation("AssetCreator")
+  memberships             Membership[]
+  notifications           Notification[]
+  approvedContentPosts    Post[]                   @relation("ContentPostApprover")
+  contentPosts            Post[]                   @relation("ContentPostCreator")
+  approvedPosts           SocialPost[]             @relation("PostApprover")
+  createdPosts            SocialPost[]             @relation("PostCreator")
+  createdLinks            TrackedLink[]            @relation("LinkCreator")
+  dashboard               UserDashboard?
+  studioThreads           StudioThread[]           @relation("StudioThreadCreator")
+}
+
+model Membership {
+  id               String       @id @default(cuid())
+  userId           String
+  organizationId   String
+  /// OWNER | BRAND_MANAGER | APPROVER | DESIGNER | MARKETER | ANALYST
+  role             String
+  /// ACTIVE | SUSPENDED
+  status           String       @default("ACTIVE")
+  /// Per-member permission grants beyond the role, e.g. ["report:read"]
+  extraPermissions Json         @default("[]")
+  createdAt        DateTime     @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model Invite {
+  id             String       @id @default(cuid())
+  organizationId String
+  email          String
+  role           String
+  /// SHA-256 of the emailed token; the token itself is never stored
+  tokenHash      String       @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  invitedById    String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+}
+
+/// Append-only operational trail.
+model AuditLog {
+  id             String        @id @default(cuid())
+  organizationId String?
+  userId         String?
+  action         String
+  entity         String
+  entityId       String?
+  /// Snapshot of changed fields
+  changes        Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime      @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([entity, entityId])
+}
+
+model Setting {
+  id             String       @id @default(cuid())
+  organizationId String
+  key            String
+  value          Json
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+}
+
+/// Per-organisation document numbering (TSK-0001, CMP-0001 …). Incremented with
+/// a single atomic SQL statement — see src/lib/numbering.ts.
+model DocumentCounter {
+  id             String       @id @default(cuid())
+  organizationId String
+  docType        String
+  prefix         String
+  nextValue      Int          @default(1)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, docType])
+}
+
+/// First-writer-wins claim on an external event or client request, so a Meta
+/// webhook retry or a double-click never does the work twice.
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  /// Organisation id, or "system"
+  scope     String
+  endpoint  String
+  response  Json?
+  createdAt DateTime @default(now())
+
+  @@index([scope])
+}
+
+/// Fixed-window counters, keyed on an identity (an email, an org, a link code),
+/// never on an IP: several people share one office or handset connection.
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+}
+
+/// Database-backed work queue. The worker claims rows with FOR UPDATE SKIP
+/// LOCKED; a crashed worker's rows are re-queued by `reapStale`, so handlers
+/// must be idempotent.
+model Job {
+  id             String    @id @default(cuid())
+  type           String
+  payload        Json      @default("{}")
+  /// QUEUED | RUNNING | DONE | DEAD
+  status         String    @default("QUEUED")
+  runAt          DateTime  @default(now())
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(5)
+  lockedAt       DateTime?
+  lockedBy       String?
+  lastError      String?
+  /// When set, a second enqueue with the same key is ignored
+  dedupeKey      String?   @unique
+  organizationId String?
+  createdAt      DateTime  @default(now())
+  finishedAt     DateTime?
+
+  @@index([status, runAt])
+  @@index([organizationId])
+}
+
+model Notification {
+  id             String        @id @default(cuid())
+  /// Null for platform-admin notifications (AI credits, budgets)
+  organizationId String?
+  userId         String
+  /// The event key from src/lib/notification-events.ts (older rows: an upper-case kind)
+  kind           String
+  title          String
+  body           String?
+  href           String?
+  readAt         DateTime?
+  createdAt      DateTime      @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([organizationId])
+}
+
+/// One email or SMS a notification produced, including the ones that were not
+/// sent (opted out, no phone, daily cap) so the log answers "why didn't I get it".
+model NotificationDelivery {
+  id             String    @id @default(cuid())
+  notificationId String?
+  organizationId String?
+  userId         String?
+  event          String
+  /// EMAIL | SMS
+  channel        String
+  /// The address or phone number it went to
+  recipient      String
+  subject        String?
+  body           String
+  /// QUEUED | SENT | FAILED | SUPPRESSED
+  status         String    @default("QUEUED")
+  /// Why it was suppressed or failed, in words an admin can act on
+  error          String?
+  provider       String?
+  providerRef    String?
+  /// Went through a development stand-in (console), not a real provider
+  mock           Boolean   @default(false)
+  attempts       Int       @default(0)
+  sentAt         DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([status, createdAt])
+  @@index([channel, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([event, createdAt])
+}
+
+/// A person's choice for one event on one channel. No row means the default;
+/// essential events ignore it (src/lib/notification-events.ts).
+model NotificationPreference {
+  userId    String
+  event     String
+  /// EMAIL | SMS
+  channel   String
+  enabled   Boolean
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, event, channel])
+}
+
+/// One-shot markers for alerts that must fire once per condition (a budget
+/// threshold this month, a low balance until it recovers, an empty wallet until
+/// the next top-up). Deleting a row re-arms the alert.
+model AlertMark {
+  key       String   @id
+  createdAt DateTime @default(now())
+}
+
+/// Every AI call, as billed by the provider's own usage figures. Budget checks
+/// sum this table; nothing here is estimated after the fact.
+model AiUsage {
+  id               String       @id @default(cuid())
+  organizationId   String
+  brandId          String?
+  feature          String
+  model            String
+  inputTokens      Int
+  outputTokens     Int
+  cacheReadTokens  Int          @default(0)
+  cacheWriteTokens Int          @default(0)
+  /// USD micro-units (1 000 000 = US$1), computed from configured model prices
+  costMicros       Int
+  requestId        String?
+  createdAt        DateTime     @default(now())
+  brand            Brand?       @relation(fields: [brandId], references: [id])
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([brandId])
+}
+
+/// A client brand. Each brand has its own catalogue, content, and social accounts.
+model Brand {
+  id              String           @id @default(cuid())
+  organizationId  String
+  name            String
+  slug            String
+  /// Human-readable brand number: BRD-0001, unique within the organisation
+  brandNumber     String
+  /// Brand guidelines: tone, voice, colors, fonts, do's and don'ts
+  guidelines      Json?
+  /// Brand avatar/logo URL
+  avatarUrl       String?
+  /// Primary contact for this brand
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  website         String?
+  /// IANA timezone, e.g. Africa/Nairobi
+  timezone        String           @default("Africa/Nairobi")
+  /// Default currency code, e.g. KES, USD
+  defaultCurrency String           @default("KES")
+  /// ACTIVE | ARCHIVED
+  status          String           @default("ACTIVE")
+  archivedAt      DateTime?
+  /// Brand-level AI settings override
+  aiOverrides     Json?
+  createdById     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  aiUsage         AiUsage[]
+  creator         User?            @relation("BrandCreator", fields: [createdById], references: [id])
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaigns       Campaign[]
+  catalogueItems  CatalogueItem[]
+  tasks           ContentTask[]
+  generatedAssets GeneratedAsset[]
+  contentPosts    Post[]
+  channels        SocialChannel[]
+  posts           SocialPost[]
+  contacts        Contact[]
+  automations     Automation[]
+  characters      Character[]
+
+  @@unique([organizationId, slug])
+  @@unique([organizationId, brandNumber])
+  @@index([organizationId])
+  @@index([organizationId, status])
+}
+
+/// A product or service in a brand's catalogue.
+model CatalogueItem {
+  id             String       @id @default(cuid())
+  brandId        String
+  /// Denormalized for tenant queries
+  organizationId String
+  name           String
+  sku            String?
+  description    String?
+  /// Price in minor units (cents). Null = price on request.
+  priceCents     Int?
+  /// URL to product image
+  imageUrl       String?
+  /// Category for grouping
+  category       String?
+  /// Tags for search/filter
+  tags           Json         @default("[]")
+  /// ACTIVE | ARCHIVED
+  status         String       @default("ACTIVE")
+  archivedAt     DateTime?
+  metadata       Json?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([brandId])
+  @@index([organizationId])
+  @@index([brandId, status])
+  @@index([brandId, category])
+}
+
+/// A content task: a brief for a designer, a submission for review, or a published piece.
+/// Workflow: DRAFT → IN_REVIEW → APPROVED → PUBLISHED (or REJECTED)
+model ContentTask {
+  id             String              @id @default(cuid())
+  organizationId String
+  brandId        String
+  /// Human-readable task number: TSK-0001, unique within the organisation
+  taskNumber     String
+  title          String
+  description    String?
+  /// IDEA | BRIEF | DESIGN | COPY | VIDEO | OTHER
+  contentType    String
+  /// DRAFT | IN_REVIEW | APPROVED | REJECTED | PUBLISHED | ARCHIVED
+  status         String              @default("DRAFT")
+  /// Priority: LOW | MEDIUM | HIGH | URGENT
+  priority       String              @default("MEDIUM")
+  /// Due date for this task
+  dueAt          DateTime?
+  /// Where the final content will be published (social channel, website, etc.)
+  targetPlatform String?
+  /// AI-generated ideas/brief attached
+  aiBrief        Json?
+  /// AI generation metadata (tokens, model used)
+  aiMetadata     Json?
+  /// Creator (marketer/brand manager who opened the brief)
+  createdById    String
+  /// Designer assigned to work on it
+  assigneeId     String?
+  /// Approver who reviewed (for audit trail)
+  approvedById   String?
+  approvedAt     DateTime?
+  publishedAt    DateTime?
+  archivedAt     DateTime?
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  comments       Comment[]
+  submissions    ContentSubmission[]
+  assignee       User?               @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  brand          Brand               @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  creator        User                @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, taskNumber])
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([createdById])
+  @@index([organizationId, status, priority])
+}
+
+/// A file/attachment submitted against a task (design mockup, copy draft, etc.)
+/// Updated version: supports AI-generated assets and richer workflow states.
+model ContentSubmission {
+  id             String          @id @default(cuid())
+  /// Original task this was created for
+  taskId         String?
+  /// Brief/description of the content
+  title          String
+  /// Creator
+  createdById    String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  /// AI metadata from generation
+  aiMetadata     Json?
+  /// Alt text for accessibility
+  altText        String?
+  /// Aspect ratio if relevant: 1:1, 9:16, 16:9, 4:5
+  aspectRatio    String?
+  /// Which generated asset this submission uses (primary image/video)
+  assetId        String?
+  /// Caption text for social posting
+  caption        String?
+  description    String?
+  organizationId String
+  reviewedAt     DateTime?
+  /// When status was changed and by whom
+  reviewedById   String?
+  /// Notes from reviewer (when status is REJECTED or APPROVED)
+  reviewerNotes  String?
+  /// DRAFT | IN_REVIEW | APPROVED | REJECTED | SCHEDULED | PUBLISHED
+  status         String          @default("DRAFT")
+  comments       Comment[]
+  asset          GeneratedAsset? @relation(fields: [assetId], references: [id])
+  creator        User            @relation("UserContentSubmissions", fields: [createdById], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  task           ContentTask?    @relation(fields: [taskId], references: [id])
+  posts          Post[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([assetId])
+  @@index([taskId])
+  @@index([createdById])
+}
+
+/// Comments on tasks and submissions for feedback loop.
+model Comment {
+  id           String             @id @default(cuid())
+  /// Commenter
+  authorId     String
+  /// Optional: comment on a task
+  taskId       String?
+  /// Optional: comment on a submission
+  submissionId String?
+  body         String
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  author       User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  submission   ContentSubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  task         ContentTask?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([submissionId])
+  @@index([authorId])
+}
+
+/// A connected social media account (Facebook Page, Instagram, WhatsApp)
+model SocialChannel {
+  id             String         @id @default(cuid())
+  organizationId String
+  brandId        String
+  /// FACEBOOK | INSTAGRAM | WHATSAPP | TWITTER | LINKEDIN | TIKTOK
+  platform       String
+  /// Platform account id (external)
+  externalId     String?
+  name           String
+  /// Handle/username on the platform
+  handle         String?
+  /// Access token (encrypted at rest)
+  tokenCipher    String?
+  tokenIv        String?
+  tokenTag       String?
+  /// Token expiry
+  tokenExpiresAt DateTime?
+  /// ACTIVE | DISCONNECTED | EXPIRED | ERROR
+  status         String         @default("ACTIVE")
+  archivedAt     DateTime?
+  /// Channel-level metadata (page id, permissions, etc.)
+  metadata       Json?
+  connectedById  String?
+  connectedAt    DateTime       @default(now())
+  lastUsedAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  brand          Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  posts          SocialPost[]
+  conversations  Conversation[]
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([brandId, platform])
+  @@index([status])
+  @@index([platform, externalId])
+}
+
+/// A social media post (draft, scheduled, published, or failed)
+model SocialPost {
+  id               String        @id @default(cuid())
+  organizationId   String
+  brandId          String
+  channelId        String
+  campaignId       String?
+  /// Post content: text, media URLs, link
+  content          Json
+  /// DRAFT | SCHEDULED | PUBLISHING | PUBLISHED | FAILED | ARCHIVED
+  status           String        @default("DRAFT")
+  /// Scheduled publish time (UTC)
+  scheduledAt      DateTime?
+  /// Actual publish time (UTC)
+  publishedAt      DateTime?
+  /// External post id (from the platform)
+  externalId       String?
+  /// External post URL
+  externalUrl      String?
+  /// Engagement metrics (likes, comments, shares, reach) — pulled periodically
+  metrics          Json?
+  /// Last time metrics were pulled
+  metricsUpdatedAt DateTime?
+  /// Error message on failure
+  error            String?
+  /// Creator
+  createdById      String
+  /// Approver (who approved it for publishing)
+  approvedById     String?
+  approvedAt       DateTime?
+  /// AI-generated caption/ideas attached
+  aiMetadata       Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  approver         User?         @relation("PostApprover", fields: [approvedById], references: [id])
+  brand            Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  campaign         Campaign?     @relation(fields: [campaignId], references: [id])
+  channel          SocialChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  creator          User          @relation("PostCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([channelId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([organizationId, status, scheduledAt])
+}
+
+/// A marketing campaign with tracked links
+model Campaign {
+  id             String              @id @default(cuid())
+  organizationId String
+  brandId        String
+  /// Human-readable campaign number: CMP-0001, unique within the organisation
+  campaignNumber String
+  name           String
+  description    String?
+  /// WhatsApp | Facebook | Instagram | Google | Direct
+  source         String
+  /// DRAFT | ACTIVE | PAUSED | COMPLETED | ARCHIVED
+  status         String              @default("DRAFT")
+  /// Campaign budget in minor units (cents)
+  budgetCents    Int?
+  /// Start date
+  startDate      DateTime?
+  /// End date
+  endDate        DateTime?
+  /// Campaign parameters (utm_source, utm_medium, utm_campaign)
+  utmParams      Json?
+  /// Target landing page URL
+  landingUrl     String?
+  /// Creator
+  createdById    String
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  brand          Brand               @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  creator        User                @relation("CampaignCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  posts          SocialPost[]
+  links          TrackedLink[]
+  contacts       Contact[]
+  characters     CampaignCharacter[]
+  assets         GeneratedAsset[]
+
+  @@unique([organizationId, campaignNumber])
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([status])
+  @@index([brandId, status])
+}
+
+/// A tracked link within a campaign (WhatsApp link, short link, QR code)
+model TrackedLink {
+  id             String       @id @default(cuid())
+  campaignId     String
+  organizationId String
+  /// Unique short code for the URL
+  shortCode      String       @unique
+  /// Destination URL (product page, wa.me link, etc.)
+  destinationUrl String
+  /// Link label (e.g. "WhatsApp", "Product A", "Landing Page")
+  label          String
+  /// Link type: whatsapp | landing | product | qr
+  linkType       String       @default("whatsapp")
+  /// Click counter (updated atomically)
+  clickCount     Int          @default(0)
+  /// Last click timestamp
+  lastClickedAt  DateTime?
+  /// QR code URL (generated on demand)
+  qrCodeUrl      String?
+  /// Creator
+  createdById    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  clicks         ClickEvent[]
+  campaign       Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creator        User         @relation("LinkCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([organizationId])
+  @@index([shortCode])
+  @@index([linkType])
+}
+
+/// Individual click events for analytics
+model ClickEvent {
+  id         String      @id @default(cuid())
+  linkId     String
+  clickedAt  DateTime    @default(now())
+  ipAddress  String?
+  userAgent  String?
+  referer    String?
+  /// Country (GeoIP lookup)
+  country    String?
+  /// Device type (mobile, desktop, tablet)
+  deviceType String?
+  link       TrackedLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId])
+  @@index([linkId, clickedAt])
+  @@index([clickedAt])
+}
+
+/// Incoming webhook events from Meta, WhatsApp, etc. Idempotent processing.
+model WebhookEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  /// meta | whatsapp | system
+  source         String
+  /// event type (message, post_published, etc.)
+  eventType      String
+  /// External event id (for deduplication)
+  externalId     String?
+  payload        Json
+  /// PENDING | PROCESSING | PROCESSED | FAILED | IGNORED
+  status         String       @default("PENDING")
+  processedAt    DateTime?
+  error          String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, externalId])
+  @@index([organizationId, status])
+  @@index([source, eventType])
+  @@index([createdAt])
+}
+
+/// Tracks an AI content generation job from Higgsfield.
+/// Status flow: DRAFT → GENERATING → READY (or FAILED)
+model GeneratedAsset {
+  id                   String              @id @default(cuid())
+  organizationId       String
+  brandId              String?
+  /// DRAFT | GENERATING | READY | FAILED
+  status               String              @default("DRAFT")
+  /// IMAGE | VIDEO
+  mediaType            String
+  /// Higgsfield endpoint used, e.g. 'flux-pro/kontext/max/text-to-image'
+  model                String
+  /// The generation prompt
+  prompt               String
+  /// External asset URL from the provider
+  url                  String?
+  /// Optional thumbnail for video assets
+  thumbnailUrl         String?
+  /// File size in bytes when downloaded
+  fileSizeBytes        Int?
+  /// MIME type: image/png, video/mp4, etc.
+  mimeType             String?
+  /// Key-value extras from the generation API response
+  metadata             Json?
+  requestId            String              @unique
+  /// Higgsfield request_id for status polling
+  externalRequestId    String?
+  /// Who created this generation
+  createdById          String
+  /// When the user initiated generation
+  createdAt            DateTime            @default(now())
+  /// When status became READY (asset available)
+  readyAt              DateTime?
+  /// When the generation failed
+  failedAt             DateTime?
+  /// Download count
+  downloadCount        Int                 @default(0)
+  /// When the asset was last downloaded
+  lastDownloadedAt     DateTime?
+  /// Clip length requested, in seconds (video only)
+  durationSeconds      Int?
+  /// As sent to the model, e.g. 16:9 or 9:16
+  aspectRatio          String?
+  /// As sent to the model, e.g. 720p
+  resolution           String?
+  /// Credits debited for this generation (0 for an INTERNAL-plan organisation).
+  /// Rows made before 2 Oct 2026 hold image/video *tokens* here.
+  tokensCharged        Int                 @default(0)
+  /// Pinned to the public landing page by a platform admin
+  showcase             Boolean             @default(false)
+  showcaseTitle        String?
+  showcasedAt          DateTime?
+  /// The public order this generation fulfils, when it does
+  orderId              String?
+  /// The campaign this creative was made for, when chosen in the Studio
+  campaignId           String?
+  /// The Studio project (chat thread) it was made in
+  threadId             String?
+  /// Source asset for animate (image to video) and extend (video to longer video)
+  parentAssetId        String?
+  /// Path under storage/ once the output has been downloaded
+  storageKey           String?
+  /// Why the generation failed, in words a user can act on
+  error                String?
+  /// Hidden from the library; the row stays for the token ledger and audit
+  archivedAt           DateTime?
+  /// The catalogue model it was made with (AiModel.key); null for rows before 3 Oct 2026
+  modelKey             String?
+  /// What the provider charged us, from its estimate: thousandths of a Higgsfield credit
+  providerMilliCredits Int?
+  /// The same in USD micro-units (1 000 000 = US$1), when the provider says
+  providerUsdMicros    Int?
+  updatedAt            DateTime            @default(now()) @updatedAt
+  order                Order?              @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  campaign             Campaign?           @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  thread               StudioThread?       @relation(fields: [threadId], references: [id], onDelete: SetNull)
+  parent               GeneratedAsset?     @relation("AssetLineage", fields: [parentAssetId], references: [id], onDelete: SetNull)
+  children             GeneratedAsset[]    @relation("AssetLineage")
+  submissions          ContentSubmission[]
+  brand                Brand?              @relation(fields: [brandId], references: [id])
+  creator              User                @relation("AssetCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization         Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([status])
+  @@index([mediaType])
+  @@index([createdById])
+  @@index([organizationId, status, mediaType])
+  @@index([orderId])
+  @@index([campaignId])
+  @@index([threadId])
+  @@index([showcase, showcasedAt])
+}
+
+/// A content post linked to a submission, ready to be published to a channel.
+/// Different from SocialPost (which is platform-specific). This is the content
+/// management layer — draft, approve, then publish to SocialPost.
+model Post {
+  id                String             @id @default(cuid())
+  organizationId    String
+  brandId           String
+  /// Which channel to post to: FACEBOOK | INSTAGRAM | WHATSAPP | TIKTOK | LINKEDIN
+  channel           String
+  /// External channel ID if connected
+  externalChannelId String?
+  /// The submission being posted
+  submissionId      String?
+  /// DRAFT | SCHEDULED | PUBLISHING | PUBLISHED | FAILED | ARCHIVED
+  status            String             @default("DRAFT")
+  /// Post caption/copy
+  caption           String
+  /// Media URLs (images, videos) — array of URLs
+  mediaUrls         Json               @default("[]")
+  /// Alt text for each media item
+  altTexts          Json               @default("[]")
+  /// Link to attach (for WhatsApp, landing pages)
+  linkUrl           String?
+  /// UTM params for the link
+  utmParams         Json?
+  /// When to publish (null = immediate)
+  scheduledAt       DateTime?
+  /// When actually published
+  publishedAt       DateTime?
+  /// External post ID from platform
+  externalPostId    String?
+  /// External post URL
+  externalUrl       String?
+  /// Engagement metrics
+  metrics           Json?
+  /// Error if posting failed
+  error             String?
+  /// Creator
+  createdById       String
+  /// Approver
+  approvedById      String?
+  approvedAt        DateTime?
+  /// AI-assisted caption metadata
+  aiMetadata        Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  approver          User?              @relation("ContentPostApprover", fields: [approvedById], references: [id])
+  brand             Brand              @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  creator           User               @relation("ContentPostCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  submission        ContentSubmission? @relation(fields: [submissionId], references: [id])
+
+  @@unique([organizationId, submissionId])
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([channel])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([submissionId])
+}
+
+/// A project or system being monitored
+/// Examples: Agency Platform, IntelliCash Mobile, IntelliCash Admin, etc.
+model Project {
+  id               String               @id @default(cuid())
+  /// Project name (e.g., "Agency Platform", "IntelliCash Mobile")
+  name             String
+  /// Unique slug for URL-friendly reference
+  slug             String               @unique
+  /// Short description
+  description      String?
+  /// Project type: web | mobile | backend | infrastructure | other
+  type             String               @default("other")
+  /// Owner/organization this project belongs to
+  ownerId          String?
+  /// Project status: active | maintenance | archived
+  status           String               @default("active")
+  /// Base URL for the project (e.g., http://localhost:3400)
+  baseUrl          String?
+  /// Health check endpoint (e.g., /api/health)
+  healthEndpoint   String?
+  /// Cron expression for automated health checks (example: every 5 minutes)
+  healthCheckCron  String?
+  /// Last health check timestamp
+  lastHealthCheck  DateTime?
+  /// Last known health status: healthy | degraded | down | unknown
+  lastHealthStatus String               @default("unknown")
+  /// When the project was created
+  createdAt        DateTime             @default(now())
+  /// When the project was last updated
+  updatedAt        DateTime             @updatedAt
+  healthChecks     HealthCheck[]
+  issues           Issue[]
+  integrations     ProjectIntegration[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([type])
+}
+
+/// Integration with external systems (LinkedIn, GitHub, etc.)
+model ProjectIntegration {
+  id           String    @id @default(cuid())
+  projectId    String
+  /// Integration type: github | linkedin | telegram | webhook | other
+  type         String
+  /// Integration name (e.g., "GitHub Repo", "LinkedIn Page")
+  name         String
+  /// Configuration data (encrypted as needed)
+  config       Json
+  /// Whether this integration is active
+  enabled      Boolean   @default(true)
+  /// Last sync timestamp
+  lastSyncedAt DateTime?
+  /// Error message from last sync (if any)
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([type])
+}
+
+/// An issue, bug, or task tracking item
+model Issue {
+  id               String         @id @default(cuid())
+  /// Issue reference number (e.g., "BUG-0001", "ISSUE-0001")
+  issueNumber      String         @unique
+  /// The project this issue belongs to
+  projectId        String
+  /// Issue title (short summary)
+  title            String
+  /// Detailed description
+  description      String?
+  /// Issue type: bug | feature | improvement | task | incident
+  type             String         @default("bug")
+  /// Priority level: low | medium | high | critical | urgent
+  priority         String         @default("medium")
+  /// Current status: open | in_progress | in_review | resolved | closed | wont_fix
+  status           String         @default("open")
+  /// Severity: info | minor | major | critical | blocker
+  severity         String         @default("major")
+  /// Who reported the issue
+  reporterId       String?
+  /// Who is currently assigned
+  assigneeId       String?
+  /// Who resolved the issue (if applicable)
+  resolvedById     String?
+  /// When the issue was resolved
+  resolvedAt       DateTime?
+  /// Root cause analysis or notes
+  rootCause        String?
+  /// Resolution notes
+  resolution       String?
+  /// Environment where the issue occurred: production | staging | development | unknown
+  environment      String         @default("unknown")
+  /// Steps to reproduce
+  stepsToReproduce String?
+  /// Expected behavior
+  expectedBehavior String?
+  /// Actual behavior observed
+  actualBehavior   String?
+  /// Attachments (screenshots, logs) as URLs
+  attachments      String[]       @default([])
+  /// Tags for categorization
+  tags             String[]       @default([])
+  /// Links to related issues
+  relatedIssueIds  String[]       @default([])
+  /// When the issue was created
+  createdAt        DateTime       @default(now())
+  /// When the issue was last updated
+  updatedAt        DateTime       @updatedAt
+  project          Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments         IssueComment[]
+  history          IssueHistory[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([priority])
+  @@index([assigneeId])
+  @@index([createdAt])
+  @@index([projectId, status, priority])
+}
+
+/// Comment on an issue
+model IssueComment {
+  id          String   @id @default(cuid())
+  issueId     String
+  authorId    String
+  body        String
+  /// Attachment URLs
+  attachments String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  issue       Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([authorId])
+  @@index([issueId, createdAt])
+}
+
+/// History of status changes and important events
+model IssueHistory {
+  id        String   @id @default(cuid())
+  issueId   String
+  action    String
+  from      String?
+  to        String?
+  note      String?
+  authorId  String?
+  createdAt DateTime @default(now())
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([issueId, createdAt])
+}
+
+/// Automated health check results
+model HealthCheck {
+  id             String   @id @default(cuid())
+  projectId      String
+  /// Status: healthy | degraded | down | unknown
+  status         String
+  /// HTTP status code if applicable
+  httpStatus     Int?
+  /// Response time in milliseconds
+  responseTimeMs Int?
+  /// Error message if any
+  errorMessage   String?
+  /// Check details (JSON)
+  details        Json?
+  /// When the check was performed
+  checkedAt      DateTime @default(now())
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([checkedAt])
+}
+
+/// Dashboard widget configuration
+model DashboardWidget {
+  id              String         @id @default(cuid())
+  /// Widget name: issue_summary | health_overview | recent_activity | priority_breakdown
+  widgetType      String
+  /// Display title
+  title           String
+  /// Filter criteria (JSON)
+  filters         Json           @default("{}")
+  /// Sort order in dashboard
+  sortOrder       Int            @default(0)
+  /// Whether widget is visible
+  visible         Boolean        @default(true)
+  /// Widget size: small | medium | large | full
+  size            String         @default("medium")
+  userDashboardId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  userDashboard   UserDashboard? @relation(fields: [userDashboardId], references: [id], onDelete: Cascade)
+
+  @@index([widgetType])
+}
+
+/// Dashboard customizations per user
+model UserDashboard {
+  id            String            @id @default(cuid())
+  userId        String            @unique
+  dashboardName String            @default("Default")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  widgets       DashboardWidget[]
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+/// Credits an organisation holds. The ledger is the history; this row is what
+/// a spend decrements with "balance >= n" in the WHERE clause, so two
+/// concurrent generations can never overdraw it. See src/server/credits.ts.
+/// (The table keeps its token-era name; since 2 Oct 2026 the only kind is CREDIT.)
+model TokenBalance {
+  id             String       @id @default(cuid())
+  organizationId String
+  /// CREDIT (IMAGE and VIDEO rows were converted by 20261002190000)
+  kind           String
+  balance        Int          @default(0)
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, kind])
+}
+
+/// Append-only history of every credit movement.
+model TokenLedger {
+  id              String         @id @default(cuid())
+  organizationId  String
+  /// CREDIT; IMAGE | VIDEO on rows from before 2 Oct 2026
+  kind            String
+  /// Credits are positive, debits negative. Zero for an INTERNAL-plan spend, recorded for visibility.
+  delta           Int
+  /// PURCHASE | SPEND | REFUND | ADJUST | GRANT (a plan's monthly credits) | CONVERT (tokens to credits)
+  reason          String
+  /// Makes a plan grant happen once, e.g. "sub:<id>:2026-11-02"
+  grantKey        String?        @unique
+  paymentIntentId String?
+  assetId         String?
+  createdById     String?
+  note            String?
+  createdAt       DateTime       @default(now())
+  organization    Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  paymentIntent   PaymentIntent? @relation(fields: [paymentIntentId], references: [id], onDelete: SetNull)
+
+  /// A payment credits each kind once; a generation is spent once and refunded once.
+  @@unique([paymentIntentId, kind, reason])
+  @@unique([assetId, reason])
+  @@index([organizationId, createdAt])
+}
+
+/// A done-for-you order placed on the public landing page. It is filed under the
+/// operator's own organisation (ORDERS_ORGANIZATION_SLUG), so the team works it
+/// from the console like anything else.
+model Order {
+  id             String           @id @default(cuid())
+  organizationId String
+  /// ORD-0001, numbered per organisation
+  number         String
+  /// Unguessable handle for the customer's status page: the only credential they hold
+  publicToken    String           @unique
+  /// IMAGE | VIDEO | QUOTE
+  kind           String
+  /// REQUESTED (waiting for the admin to price it) | PENDING_PAYMENT | PAID | PAYMENT_FAILED | IN_PRODUCTION | DELIVERED | CANCELLED
+  status         String           @default("REQUESTED")
+  customerName   String
+  /// Canonical digits, 2547XXXXXXXX (src/lib/identity.ts)
+  customerPhone  String
+  customerEmail  String?
+  businessName   String?
+  brief          String
+  /// Number of images ordered (named in the token era, when one image was one token)
+  imageTokens    Int              @default(0)
+  videoSeconds   Int              @default(0)
+  /// Video tokens, on orders placed before 2 Oct 2026 only
+  videoTokens    Int              @default(0)
+  /// Credits the order uses; its price is these at the pay-as-you-go rate
+  credits        Int              @default(0)
+  aspectRatio    String?
+  /// Extra services asked for (keys of EXTRAS in src/lib/pricing.ts), priced on request
+  extras         Json             @default("[]")
+  referenceLink  String?
+  /// What the customer is charged. Set by a platform admin when the request is priced; never taken from the request
+  amountCents    Int
+  /// PUBLIC (the landing form) | ADMIN (entered by a platform admin for a customer)
+  source         String           @default("PUBLIC")
+  /// The calculator's estimate from src/lib/pricing.ts, for the admin's reference only
+  suggestedCents Int              @default(0)
+  /// Internal note from the admin; never shown to the customer
+  adminNote      String?
+  pricedById     String?
+  pricedAt       DateTime?
+  /// When the admin sent the priced order to the customer for payment
+  submittedAt    DateTime?
+  currency       String           @default("KES")
+  paidAt         DateTime?
+  deliveredAt    DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  paymentIntents PaymentIntent[]
+  assets         GeneratedAsset[]
+  studioThreads  StudioThread[]
+
+  @@unique([organizationId, number])
+  @@index([organizationId, status, createdAt])
+  @@index([customerPhone])
+}
+
+/// One attempt to collect money: an M-Pesa STK push or a Paystack checkout or
+/// card charge. The provider decides whether money moved: a callback or webhook
+/// only names the intent to re-check, and settlement is confirmed by asking the
+/// provider (STK Query, Paystack verify) in src/server/payments.ts.
+model PaymentIntent {
+  id                String        @id @default(cuid())
+  organizationId    String
+  /// ORDER | CREDITS | SUBSCRIPTION | TOKENS (before 2 Oct 2026)
+  purpose           String
+  orderId           String?
+  /// For TOKENS (legacy): what the payment bought
+  imageTokens       Int           @default(0)
+  videoTokens       Int           @default(0)
+  /// For CREDITS: the credits it buys. For SUBSCRIPTION: the plan's first month of credits
+  credits           Int           @default(0)
+  /// For SUBSCRIPTION: BASIC | PRO | MAX and MONTHLY | ANNUAL
+  planKey           String?
+  billingCycle      String?
+  /// True for a renewal charged to a saved card without the customer present
+  automatic         Boolean       @default(false)
+  /// MPESA_DARAJA | SIMULATOR | PAYSTACK | PAYSTACK_SIMULATOR
+  provider          String
+  /// Canonical payer phone, 2547XXXXXXXX (M-Pesa STK only)
+  phone             String?
+  /// Payer email (Paystack only; Paystack requires one)
+  email             String?
+  /// Where the customer pays (Paystack's hosted checkout)
+  checkoutUrl       String?
+  /// How it was paid, as the provider reports it: card, mobile_money, mpesa ...
+  channel           String?
+  amountCents       Int
+  currency          String        @default("KES")
+  /// PENDING | PROCESSING | SUCCEEDED | FAILED
+  status            String        @default("PENDING")
+  /// Daraja CheckoutRequestID, or the Paystack reference
+  providerRef       String?
+  merchantRequestId String?
+  /// M-Pesa receipt number
+  receiptRef        String?
+  failureReason     String?
+  /// Last provider response, truncated; for support, never for decisions
+  providerPayload   String?
+  createdById       String?
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  completedAt       DateTime?
+  organization      Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  order             Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  ledger            TokenLedger[]
+
+  @@unique([provider, providerRef])
+  @@index([organizationId, createdAt])
+  @@index([orderId])
+  @@index([status, createdAt])
+}
+
+/// An organisation's Tari Studio plan (src/lib/pricing.ts). One row per
+/// organisation; no row means the Free plan. Renewal, the monthly credit grant
+/// of yearly plans, and expiry are run by the worker (src/server/subscriptions.ts).
+model Subscription {
+  id                    String       @id @default(cuid())
+  organizationId        String       @unique
+  /// BASIC | PRO | MAX
+  plan                  String
+  /// MONTHLY | ANNUAL
+  cycle                 String
+  /// ACTIVE | PAST_DUE (a renewal charge failed, retrying) | EXPIRED
+  status                String       @default("ACTIVE")
+  /// PAYSTACK | MPESA: how the current period was paid
+  paymentMethod         String
+  /// Charge the saved card when the period ends. Only possible with a reusable Paystack card.
+  autoRenew             Boolean      @default(false)
+  currentPeriodStart    DateTime
+  currentPeriodEnd      DateTime
+  /// What the customer agreed to when they bought or last changed the plan:
+  /// renewals charge this and grant this, whatever the admin's price list says now
+  priceCents            Int          @default(0)
+  creditsPerMonth       Int          @default(0)
+  /// Yearly plans grant their credits month by month; when the next grant is due
+  nextGrantAt           DateTime?
+  /// Paystack's reusable card authorization, sealed with the credentials key
+  authCipherText        String?
+  authIv                String?
+  authTag               String?
+  /// e.g. "Visa •••• 4081", shown so the owner knows which card renews
+  cardLabel             String?
+  billingEmail          String?
+  renewalAttempts       Int          @default(0)
+  nextRenewalAttemptAt  DateTime?
+  /// Organization.plan before the subscription raised it, restored when it ends
+  previousWorkspacePlan String?
+  cancelledAt           DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+  organization          Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([status, currentPeriodEnd])
+  @@index([nextGrantAt])
+}
+
+/// A Video Studio project: one chat thread and the clips made in it.
+model StudioThread {
+  id             String           @id @default(cuid())
+  organizationId String
+  createdById    String
+  title          String
+  /// Set when the project produces a public order; its generations are attached to that order
+  orderId        String?
+  archivedAt     DateTime?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator        User             @relation("StudioThreadCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  order          Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  messages       StudioMessage[]
+  assets         GeneratedAsset[]
+
+  @@index([organizationId, archivedAt, updatedAt])
+  @@index([orderId])
+}
+
+/// A turn in a Studio thread. An assistant QUOTE becomes a GENERATION once the
+/// user presses Generate; assetId is claimed exactly once, which is what stops a
+/// double-click from spending tokens twice.
+model StudioMessage {
+  id             String       @id @default(cuid())
+  threadId       String
+  organizationId String
+  /// USER | ASSISTANT
+  role           String
+  /// TEXT | QUOTE | GENERATION
+  kind           String       @default("TEXT")
+  body           String
+  assetId        String?      @unique
+  /// QUOTE: { mode, prompt, seconds, aspectRatio, tokens, parentAssetId? }
+  meta           Json?
+  createdAt      DateTime     @default(now())
+  thread         StudioThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([threadId, createdAt])
+  @@index([organizationId])
+}
+
+/// The image and video models customers can choose in the Studio, managed by a
+/// platform admin (Platform admin → AI & credits). The family picks the request
+/// builder in src/lib/generation-models.ts; endpoints map each mode to the
+/// provider's path.
+model AiModel {
+  /// Stable id, e.g. "seedance-2.5"
+  key                      String   @id
+  label                    String
+  /// HIGGSFIELD
+  provider                 String   @default("HIGGSFIELD")
+  /// soul | seedance | kling | hailuo
+  family                   String
+  /// IMAGE | VIDEO
+  mediaType                String
+  /// Mode → endpoint, e.g. {"video": "bytedance/seedance-2.5/text-to-video"}
+  endpoints                Json
+  enabled                  Boolean  @default(false)
+  /// The modes this model is picked for when the customer does not choose
+  defaultFor               String[] @default([])
+  /// Customer credits per image; null = the price list's image rate
+  creditsPerImage          Int?
+  /// Customer credits per started 5 s of video; null = the price list's video rate
+  creditsPerStep           Int?
+  /// What the provider charges per image / per 5 s, in thousandths of a credit (for the margin column)
+  providerMilliCreditsHint Int?
+  description              String?
+  sortOrder                Int      @default(0)
+  updatedById              String?
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+}
+
+/// The platform's own credit balance with a generation provider (Higgsfield has
+/// no balance API): top-ups an admin records, usage written as each generation
+/// completes, adjustments to match the provider's console, and expiries.
+model ProviderCreditLedger {
+  id             String    @id @default(cuid())
+  /// HIGGSFIELD
+  provider       String
+  /// TOPUP | USAGE | ADJUST | EXPIRE
+  kind           String
+  /// Signed, thousandths of a provider credit
+  milliCredits   Int
+  /// Signed, USD micro-units, when known (what a top-up cost, what a render cost)
+  usdMicros      Int?
+  /// TOPUP: when these credits lapse (Higgsfield: a year after purchase)
+  expiresAt      DateTime?
+  /// TOPUP: how much of it usage has drawn down, oldest top-up first
+  consumedMilli  Int       @default(0)
+  /// TOPUP: when the unused remainder was written off
+  expiredAt      DateTime?
+  organizationId String?
+  /// USAGE: the generation it paid for (one row per generation)
+  assetId        String?   @unique
+  modelKey       String?
+  note           String?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+
+  @@index([provider, createdAt])
+  @@index([provider, kind, expiresAt])
+  @@index([organizationId, createdAt])
+}
+
+/// Deployment-wide configuration a platform admin edits in the console: provider
+/// modes, models and keys, named after the environment variable each overrides.
+/// Resolution is organisation gateway (Settings) → this table → the server .env.
+/// Secrets are sealed at rest (src/lib/secrets.ts) and never read back out.
+model PlatformSetting {
+  /// The environment variable it overrides, e.g. ANTHROPIC_API_KEY
+  key         String   @id
+  /// Plain values only: provider names, model names, ids
+  value       String?
+  cipherText  String?
+  iv          String?
+  authTag     String?
+  updatedById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// Someone the business talks to — on WhatsApp first, so the phone number is the
+/// identity. A contact is a lead: its stage is the sales pipeline.
+model Contact {
+  id             String         @id @default(cuid())
+  organizationId String
+  brandId        String?
+  /// Digits only, country code first, no "+": 254712345678 (WhatsApp's wa_id)
+  phone          String
+  name           String?
+  /// NEW | CONTACTED | QUALIFIED | WON | LOST
+  stage          String         @default("NEW")
+  /// WHATSAPP | ORDER | MANUAL
+  source         String         @default("WHATSAPP")
+  /// The campaign whose tracked link started the conversation, when a ref code arrived with it
+  campaignId     String?
+  tags           Json           @default("[]")
+  notes          String?
+  lastMessageAt  DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brand          Brand?         @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  campaign       Campaign?      @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  conversations  Conversation[]
+
+  @@unique([organizationId, phone])
+  @@index([organizationId, stage])
+  @@index([organizationId, lastMessageAt])
+  @@index([campaignId])
+}
+
+/// One WhatsApp number talking to one contact.
+model Conversation {
+  id                 String        @id @default(cuid())
+  organizationId     String
+  channelId          String
+  contactId          String
+  /// OPEN | CLOSED
+  status             String        @default("OPEN")
+  unreadCount        Int           @default(0)
+  /// The customer's last message. Free-form replies are allowed for 24 hours after it.
+  lastInboundAt      DateTime?
+  lastMessageAt      DateTime?
+  lastMessagePreview String?
+  /// Automations stay quiet while a person handles the conversation
+  automationsPaused  Boolean       @default(false)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  organization       Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  channel            SocialChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  contact            Contact       @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  messages           Message[]
+
+  @@unique([channelId, contactId])
+  @@index([organizationId, lastMessageAt])
+  @@index([contactId])
+}
+
+/// A WhatsApp message in either direction.
+model Message {
+  id             String       @id @default(cuid())
+  organizationId String
+  conversationId String
+  /// IN | OUT
+  direction      String
+  /// text | image | video | audio | document | location | interactive | unsupported
+  type           String       @default("text")
+  body           String?
+  /// The provider's media id for non-text messages
+  mediaId        String?
+  /// WhatsApp's wamid. Unique per organisation, so a webhook retry is a no-op.
+  externalId     String?
+  /// IN: RECEIVED. OUT: QUEUED | SENT | DELIVERED | READ | FAILED
+  status         String
+  error          String?
+  /// OUT only — PERSON | AUTOMATION | AI
+  author         String?
+  sentById       String?
+  automationId   String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, externalId])
+  @@index([conversationId, createdAt])
+}
+
+/// "When this happens, do that." Evaluated by src/server/automations.ts.
+model Automation {
+  id             String          @id @default(cuid())
+  organizationId String
+  /// Only events for this brand's channels and links fire it; null = every brand
+  brandId        String?
+  name           String
+  /// MESSAGE_RECEIVED | LEAD_CREATED | LINK_CLICKED
+  trigger        String
+  /// Trigger-specific filter, e.g. { "match": "keywords", "keywords": ["price"] }
+  conditions     Json            @default("{}")
+  /// Ordered steps, e.g. [{ "type": "SEND_REPLY", "text": "…" }]
+  actions        Json            @default("[]")
+  enabled        Boolean         @default(true)
+  runCount       Int             @default(0)
+  lastRunAt      DateTime?
+  createdById    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brand          Brand?          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  runs           AutomationRun[]
+
+  @@index([organizationId, trigger, enabled])
+}
+
+/// One automation answering one event. The unique key is the idempotency guard:
+/// a redelivered webhook or a retried job cannot run the same automation twice.
+model AutomationRun {
+  id             String       @id @default(cuid())
+  automationId   String
+  organizationId String
+  /// e.g. "msg:<messageId>", "click:<clickEventId>", "lead:<contactId>"
+  eventKey       String
+  /// RUNNING | SUCCEEDED | FAILED | SKIPPED
+  status         String
+  detail         Json?
+  error          String?
+  createdAt      DateTime     @default(now())
+  finishedAt     DateTime?
+  automation     Automation   @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([automationId, eventKey])
+  @@index([organizationId, createdAt])
+}
+
+/// A look-and-feel pack published by a platform admin: a description and a set
+/// of reference images that every agency can browse and use in the Studio.
+/// Global (not per organisation).
+model Template {
+  id          String          @id @default(cuid())
+  title       String
+  slug        String          @unique
+  description String
+  category    String?
+  /// Text put in front of the prompt when this template is used (optional)
+  promptHint  String?
+  /// DRAFT | PUBLISHED
+  status      String          @default("DRAFT")
+  createdById String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  images      TemplateImage[]
+
+  @@index([status, updatedAt])
+}
+
+model TemplateImage {
+  id            String   @id @default(cuid())
+  templateId    String
+  /// Path under storage/ (server-generated, never from the upload)
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  caption       String?
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  template      Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId, sortOrder])
+}
+
+/// A recurring character (a mascot, a model, a persona) an agency keeps
+/// reference images of, to reuse across campaigns.
+model Character {
+  id             String              @id @default(cuid())
+  organizationId String
+  brandId        String?
+  name           String
+  /// How the character looks and behaves; put into the prompt when used
+  description    String              @default("")
+  /// UPLOAD | GENERATED
+  source         String              @default("UPLOAD")
+  createdById    String?
+  archivedAt     DateTime?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brand          Brand?              @relation(fields: [brandId], references: [id], onDelete: SetNull)
+  images         CharacterImage[]
+  campaigns      CampaignCharacter[]
+
+  @@index([organizationId, archivedAt])
+  @@index([brandId])
+}
+
+model CharacterImage {
+  id            String    @id @default(cuid())
+  characterId   String
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  sortOrder     Int       @default(0)
+  /// The generated asset this image was saved from, when it was
+  assetId       String?
+  createdAt     DateTime  @default(now())
+  character     Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@index([characterId, sortOrder])
+}
+
+/// Which characters take part in a campaign.
+model CampaignCharacter {
+  campaignId  String
+  characterId String
+  createdAt   DateTime  @default(now())
+  campaign    Campaign  @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+
+  @@id([campaignId, characterId])
+  @@index([characterId])
+}

@@ -1,0 +1,996 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// A tenant: one agency. Everything else hangs off this.
+model Organization {
+  id               String               @id @default(cuid())
+  name             String
+  slug             String               @unique
+  /// ACTIVE | SUSPENDED — a suspended tenant loses access even with a live token
+  status           String               @default("ACTIVE")
+  /// TRIAL | STARTER | GROWTH | PRO | INTERNAL — see src/lib/limits.ts
+  plan             String               @default("TRIAL")
+  /// Per-organisation overrides of the plan's limits, e.g. {"brands": 12}
+  limitsOverride   Json?
+  /// IANA zone. Timestamps are stored UTC and shown in this zone.
+  timezone         String               @default("Africa/Nairobi")
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  aiUsage          AiUsage[]
+  auditLogs        AuditLog[]
+  brands           Brand[]
+  campaigns        Campaign[]
+  catalogueItems   CatalogueItem[]
+  submissions      ContentSubmission[]
+  tasks            ContentTask[]
+  documentCounters DocumentCounter[]
+  generatedAssets  GeneratedAsset[]
+  invites          Invite[]
+  memberships      Membership[]
+  notifications    Notification[]
+  modules          OrganizationModule[]
+  contentPosts     Post[]
+  settings         Setting[]
+  channels         SocialChannel[]
+  posts            SocialPost[]
+  links            TrackedLink[]
+  webhookEvents    WebhookEvent[]
+}
+
+/// The licensing gate: a module the tenant has bought. Read on every request,
+/// never baked into a token, so revoking takes effect immediately.
+model OrganizationModule {
+  id             String       @id @default(cuid())
+  organizationId String
+  moduleKey      String
+  enabled        Boolean      @default(true)
+  enabledAt      DateTime     @default(now())
+  enabledById    String?
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, moduleKey])
+  @@index([organizationId])
+}
+
+/// A person. Belongs to organisations through `Membership`, so a freelance
+/// designer serving several agencies is one account, not several.
+model User {
+  id                   String              @id @default(cuid())
+  /// Stored lower-cased; normalised at the boundary (src/lib/identity.ts)
+  email                String              @unique
+  name                 String
+  passwordHash         String
+  /// ACTIVE | SUSPENDED
+  status               String              @default("ACTIVE")
+  /// Platform staff. Not a membership role: it is not granted inside an org.
+  isPlatformAdmin      Boolean             @default(false)
+  /// Bumped to revoke every session for this user (password change, "sign out everywhere")
+  tokenVersion         Int                 @default(0)
+  /// The organisation the user is currently working in
+  activeOrganizationId String?
+  totpCipher           String?
+  totpIv               String?
+  totpTag              String?
+  totpEnabledAt        DateTime?
+  /// Last accepted 30 s counter — a code from an earlier or equal step is a replay
+  totpLastCounter      Int?
+  lastLoginAt          DateTime?
+  createdAt            DateTime            @default(now())
+  updatedAt            DateTime            @updatedAt
+  createdBrands        Brand[]             @relation("BrandCreator")
+  createdCampaigns     Campaign[]          @relation("CampaignCreator")
+  comments             Comment[]
+  contentSubmissions   ContentSubmission[] @relation("UserContentSubmissions")
+  assignedTasks        ContentTask[]       @relation("TaskAssignee")
+  createdTasks         ContentTask[]       @relation("TaskCreator")
+  createdAssets        GeneratedAsset[]    @relation("AssetCreator")
+  memberships          Membership[]
+  notifications        Notification[]
+  approvedContentPosts Post[]              @relation("ContentPostApprover")
+  contentPosts         Post[]              @relation("ContentPostCreator")
+  approvedPosts        SocialPost[]        @relation("PostApprover")
+  createdPosts         SocialPost[]        @relation("PostCreator")
+  createdLinks         TrackedLink[]       @relation("LinkCreator")
+  dashboard            UserDashboard?
+}
+
+model Membership {
+  id               String       @id @default(cuid())
+  userId           String
+  organizationId   String
+  /// OWNER | BRAND_MANAGER | APPROVER | DESIGNER | MARKETER | ANALYST
+  role             String
+  /// ACTIVE | SUSPENDED
+  status           String       @default("ACTIVE")
+  /// Per-member permission grants beyond the role, e.g. ["report:read"]
+  extraPermissions Json         @default("[]")
+  createdAt        DateTime     @default(now())
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+  @@index([organizationId])
+}
+
+model Invite {
+  id             String       @id @default(cuid())
+  organizationId String
+  email          String
+  role           String
+  /// SHA-256 of the emailed token; the token itself is never stored
+  tokenHash      String       @unique
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  revokedAt      DateTime?
+  invitedById    String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, email])
+}
+
+/// Append-only operational trail.
+model AuditLog {
+  id             String        @id @default(cuid())
+  organizationId String?
+  userId         String?
+  action         String
+  entity         String
+  entityId       String?
+  /// Snapshot of changed fields
+  changes        Json?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime      @default(now())
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([entity, entityId])
+}
+
+model Setting {
+  id             String       @id @default(cuid())
+  organizationId String
+  key            String
+  value          Json
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, key])
+}
+
+/// Per-organisation document numbering (TSK-0001, CMP-0001 …). Incremented with
+/// a single atomic SQL statement — see src/lib/numbering.ts.
+model DocumentCounter {
+  id             String       @id @default(cuid())
+  organizationId String
+  docType        String
+  prefix         String
+  nextValue      Int          @default(1)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, docType])
+}
+
+/// First-writer-wins claim on an external event or client request, so a Meta
+/// webhook retry or a double-click never does the work twice.
+model IdempotencyKey {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  /// Organisation id, or "system"
+  scope     String
+  endpoint  String
+  response  Json?
+  createdAt DateTime @default(now())
+
+  @@index([scope])
+}
+
+/// Fixed-window counters, keyed on an identity (an email, an org, a link code),
+/// never on an IP: several people share one office or handset connection.
+model RateLimitBucket {
+  key         String
+  windowStart DateTime
+  count       Int      @default(0)
+
+  @@id([key, windowStart])
+  @@index([windowStart])
+}
+
+/// Database-backed work queue. The worker claims rows with FOR UPDATE SKIP
+/// LOCKED; a crashed worker's rows are re-queued by `reapStale`, so handlers
+/// must be idempotent.
+model Job {
+  id             String    @id @default(cuid())
+  type           String
+  payload        Json      @default("{}")
+  /// QUEUED | RUNNING | DONE | DEAD
+  status         String    @default("QUEUED")
+  runAt          DateTime  @default(now())
+  attempts       Int       @default(0)
+  maxAttempts    Int       @default(5)
+  lockedAt       DateTime?
+  lockedBy       String?
+  lastError      String?
+  /// When set, a second enqueue with the same key is ignored
+  dedupeKey      String?   @unique
+  organizationId String?
+  createdAt      DateTime  @default(now())
+  finishedAt     DateTime?
+
+  @@index([status, runAt])
+  @@index([organizationId])
+}
+
+model Notification {
+  id             String       @id @default(cuid())
+  organizationId String
+  userId         String
+  kind           String
+  title          String
+  body           String?
+  href           String?
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt])
+  @@index([organizationId])
+}
+
+/// Every AI call, as billed by the provider's own usage figures. Budget checks
+/// sum this table; nothing here is estimated after the fact.
+model AiUsage {
+  id               String       @id @default(cuid())
+  organizationId   String
+  brandId          String?
+  feature          String
+  model            String
+  inputTokens      Int
+  outputTokens     Int
+  cacheReadTokens  Int          @default(0)
+  cacheWriteTokens Int          @default(0)
+  /// USD micro-units (1 000 000 = US$1), computed from configured model prices
+  costMicros       Int
+  requestId        String?
+  createdAt        DateTime     @default(now())
+  brand            Brand?       @relation(fields: [brandId], references: [id])
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, createdAt])
+  @@index([brandId])
+}
+
+/// A client brand. Each brand has its own catalogue, content, and social accounts.
+model Brand {
+  id              String           @id @default(cuid())
+  organizationId  String
+  name            String
+  slug            String
+  /// Human-readable brand number: BRD-0001
+  brandNumber     String           @unique
+  /// Brand guidelines: tone, voice, colors, fonts, do's and don'ts
+  guidelines      Json?
+  /// Brand avatar/logo URL
+  avatarUrl       String?
+  /// Primary contact for this brand
+  contactName     String?
+  contactEmail    String?
+  contactPhone    String?
+  website         String?
+  /// IANA timezone, e.g. Africa/Nairobi
+  timezone        String           @default("Africa/Nairobi")
+  /// Default currency code, e.g. KES, USD
+  defaultCurrency String           @default("KES")
+  /// ACTIVE | ARCHIVED
+  status          String           @default("ACTIVE")
+  archivedAt      DateTime?
+  /// Brand-level AI settings override
+  aiOverrides     Json?
+  createdById     String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  aiUsage         AiUsage[]
+  creator         User?            @relation("BrandCreator", fields: [createdById], references: [id])
+  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  campaigns       Campaign[]
+  catalogueItems  CatalogueItem[]
+  tasks           ContentTask[]
+  generatedAssets GeneratedAsset[]
+  contentPosts    Post[]
+  channels        SocialChannel[]
+  posts           SocialPost[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+  @@index([organizationId, status])
+}
+
+/// A product or service in a brand's catalogue.
+model CatalogueItem {
+  id             String       @id @default(cuid())
+  brandId        String
+  /// Denormalized for tenant queries
+  organizationId String
+  name           String
+  sku            String?
+  description    String?
+  /// Price in minor units (cents). Null = price on request.
+  priceCents     Int?
+  /// URL to product image
+  imageUrl       String?
+  /// Category for grouping
+  category       String?
+  /// Tags for search/filter
+  tags           Json         @default("[]")
+  /// ACTIVE | ARCHIVED
+  status         String       @default("ACTIVE")
+  archivedAt     DateTime?
+  metadata       Json?
+  createdById    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([brandId])
+  @@index([organizationId])
+  @@index([brandId, status])
+  @@index([brandId, category])
+}
+
+/// A content task: a brief for a designer, a submission for review, or a published piece.
+/// Workflow: DRAFT → IN_REVIEW → APPROVED → PUBLISHED (or REJECTED)
+model ContentTask {
+  id             String              @id @default(cuid())
+  organizationId String
+  brandId        String
+  /// Human-readable task number: TSK-0001
+  taskNumber     String              @unique
+  title          String
+  description    String?
+  /// IDEA | BRIEF | DESIGN | COPY | VIDEO | OTHER
+  contentType    String
+  /// DRAFT | IN_REVIEW | APPROVED | REJECTED | PUBLISHED | ARCHIVED
+  status         String              @default("DRAFT")
+  /// Priority: LOW | MEDIUM | HIGH | URGENT
+  priority       String              @default("MEDIUM")
+  /// Due date for this task
+  dueAt          DateTime?
+  /// Where the final content will be published (social channel, website, etc.)
+  targetPlatform String?
+  /// AI-generated ideas/brief attached
+  aiBrief        Json?
+  /// AI generation metadata (tokens, model used)
+  aiMetadata     Json?
+  /// Creator (marketer/brand manager who opened the brief)
+  createdById    String
+  /// Designer assigned to work on it
+  assigneeId     String?
+  /// Approver who reviewed (for audit trail)
+  approvedById   String?
+  approvedAt     DateTime?
+  publishedAt    DateTime?
+  archivedAt     DateTime?
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  comments       Comment[]
+  submissions    ContentSubmission[]
+  assignee       User?               @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  brand          Brand               @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  creator        User                @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization   Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([createdById])
+  @@index([organizationId, status, priority])
+}
+
+/// A file/attachment submitted against a task (design mockup, copy draft, etc.)
+/// Updated version: supports AI-generated assets and richer workflow states.
+model ContentSubmission {
+  id             String          @id @default(cuid())
+  /// Original task this was created for
+  taskId         String?
+  /// Brief/description of the content
+  title          String
+  /// Creator
+  createdById    String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  /// AI metadata from generation
+  aiMetadata     Json?
+  /// Alt text for accessibility
+  altText        String?
+  /// Aspect ratio if relevant: 1:1, 9:16, 16:9, 4:5
+  aspectRatio    String?
+  /// Which generated asset this submission uses (primary image/video)
+  assetId        String?
+  /// Caption text for social posting
+  caption        String?
+  description    String?
+  organizationId String
+  reviewedAt     DateTime?
+  /// When status was changed and by whom
+  reviewedById   String?
+  /// Notes from reviewer (when status is REJECTED or APPROVED)
+  reviewerNotes  String?
+  /// DRAFT | IN_REVIEW | APPROVED | REJECTED | SCHEDULED | PUBLISHED
+  status         String          @default("DRAFT")
+  comments       Comment[]
+  asset          GeneratedAsset? @relation(fields: [assetId], references: [id])
+  creator        User            @relation("UserContentSubmissions", fields: [createdById], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  task           ContentTask?    @relation(fields: [taskId], references: [id])
+  posts          Post[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([assetId])
+  @@index([taskId])
+  @@index([createdById])
+}
+
+/// Comments on tasks and submissions for feedback loop.
+model Comment {
+  id           String             @id @default(cuid())
+  /// Commenter
+  authorId     String
+  /// Optional: comment on a task
+  taskId       String?
+  /// Optional: comment on a submission
+  submissionId String?
+  body         String
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  author       User               @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  submission   ContentSubmission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  task         ContentTask?       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
+  @@index([submissionId])
+  @@index([authorId])
+}
+
+/// A connected social media account (Facebook Page, Instagram, WhatsApp)
+model SocialChannel {
+  id             String       @id @default(cuid())
+  organizationId String
+  brandId        String
+  /// FACEBOOK | INSTAGRAM | WHATSAPP | TWITTER | LINKEDIN | TIKTOK
+  platform       String
+  /// Platform account id (external)
+  externalId     String?
+  name           String
+  /// Handle/username on the platform
+  handle         String?
+  /// Access token (encrypted at rest)
+  tokenCipher    String?
+  tokenIv        String?
+  tokenTag       String?
+  /// Token expiry
+  tokenExpiresAt DateTime?
+  /// ACTIVE | DISCONNECTED | EXPIRED | ERROR
+  status         String       @default("ACTIVE")
+  archivedAt     DateTime?
+  /// Channel-level metadata (page id, permissions, etc.)
+  metadata       Json?
+  connectedById  String?
+  connectedAt    DateTime     @default(now())
+  lastUsedAt     DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  posts          SocialPost[]
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([brandId, platform])
+  @@index([status])
+}
+
+/// A social media post (draft, scheduled, published, or failed)
+model SocialPost {
+  id               String        @id @default(cuid())
+  organizationId   String
+  brandId          String
+  channelId        String
+  campaignId       String?
+  /// Post content: text, media URLs, link
+  content          Json
+  /// DRAFT | SCHEDULED | PUBLISHING | PUBLISHED | FAILED | ARCHIVED
+  status           String        @default("DRAFT")
+  /// Scheduled publish time (UTC)
+  scheduledAt      DateTime?
+  /// Actual publish time (UTC)
+  publishedAt      DateTime?
+  /// External post id (from the platform)
+  externalId       String?
+  /// External post URL
+  externalUrl      String?
+  /// Engagement metrics (likes, comments, shares, reach) — pulled periodically
+  metrics          Json?
+  /// Last time metrics were pulled
+  metricsUpdatedAt DateTime?
+  /// Error message on failure
+  error            String?
+  /// Creator
+  createdById      String
+  /// Approver (who approved it for publishing)
+  approvedById     String?
+  approvedAt       DateTime?
+  /// AI-generated caption/ideas attached
+  aiMetadata       Json?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+  approver         User?         @relation("PostApprover", fields: [approvedById], references: [id])
+  brand            Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  campaign         Campaign?     @relation(fields: [campaignId], references: [id])
+  channel          SocialChannel @relation(fields: [channelId], references: [id], onDelete: Cascade)
+  creator          User          @relation("PostCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization     Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([channelId])
+  @@index([campaignId])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([organizationId, status, scheduledAt])
+}
+
+/// A marketing campaign with tracked links
+model Campaign {
+  id             String        @id @default(cuid())
+  organizationId String
+  brandId        String
+  /// Human-readable campaign number: CMP-0001
+  campaignNumber String        @unique
+  name           String
+  description    String?
+  /// WhatsApp | Facebook | Instagram | Google | Direct
+  source         String
+  /// DRAFT | ACTIVE | PAUSED | COMPLETED | ARCHIVED
+  status         String        @default("DRAFT")
+  /// Campaign budget in minor units (cents)
+  budgetCents    Int?
+  /// Start date
+  startDate      DateTime?
+  /// End date
+  endDate        DateTime?
+  /// Campaign parameters (utm_source, utm_medium, utm_campaign)
+  utmParams      Json?
+  /// Target landing page URL
+  landingUrl     String?
+  /// Creator
+  createdById    String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  brand          Brand         @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  creator        User          @relation("CampaignCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  posts          SocialPost[]
+  links          TrackedLink[]
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([status])
+  @@index([brandId, status])
+}
+
+/// A tracked link within a campaign (WhatsApp link, short link, QR code)
+model TrackedLink {
+  id             String       @id @default(cuid())
+  campaignId     String
+  organizationId String
+  /// Unique short code for the URL
+  shortCode      String       @unique
+  /// Destination URL (product page, wa.me link, etc.)
+  destinationUrl String
+  /// Link label (e.g. "WhatsApp", "Product A", "Landing Page")
+  label          String
+  /// Link type: whatsapp | landing | product | qr
+  linkType       String       @default("whatsapp")
+  /// Click counter (updated atomically)
+  clickCount     Int          @default(0)
+  /// Last click timestamp
+  lastClickedAt  DateTime?
+  /// QR code URL (generated on demand)
+  qrCodeUrl      String?
+  /// Creator
+  createdById    String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  clicks         ClickEvent[]
+  campaign       Campaign     @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  creator        User         @relation("LinkCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([campaignId])
+  @@index([organizationId])
+  @@index([shortCode])
+  @@index([linkType])
+}
+
+/// Individual click events for analytics
+model ClickEvent {
+  id         String      @id @default(cuid())
+  linkId     String
+  clickedAt  DateTime    @default(now())
+  ipAddress  String?
+  userAgent  String?
+  referer    String?
+  /// Country (GeoIP lookup)
+  country    String?
+  /// Device type (mobile, desktop, tablet)
+  deviceType String?
+  link       TrackedLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+
+  @@index([linkId])
+  @@index([linkId, clickedAt])
+  @@index([clickedAt])
+}
+
+/// Incoming webhook events from Meta, WhatsApp, etc. Idempotent processing.
+model WebhookEvent {
+  id             String       @id @default(cuid())
+  organizationId String
+  /// meta | whatsapp | system
+  source         String
+  /// event type (message, post_published, etc.)
+  eventType      String
+  /// External event id (for deduplication)
+  externalId     String?
+  payload        Json
+  /// PENDING | PROCESSING | PROCESSED | FAILED | IGNORED
+  status         String       @default("PENDING")
+  processedAt    DateTime?
+  error          String?
+  createdAt      DateTime     @default(now())
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, externalId])
+  @@index([organizationId, status])
+  @@index([source, eventType])
+  @@index([createdAt])
+}
+
+/// Tracks an AI content generation job from Higgsfield.
+/// Status flow: DRAFT → GENERATING → READY (or FAILED)
+model GeneratedAsset {
+  id                String              @id @default(cuid())
+  organizationId    String
+  brandId           String?
+  /// DRAFT | GENERATING | READY | FAILED
+  status            String              @default("DRAFT")
+  /// IMAGE | VIDEO
+  mediaType         String
+  /// Higgsfield endpoint used, e.g. 'flux-pro/kontext/max/text-to-image'
+  model             String
+  /// The generation prompt
+  prompt            String
+  /// External asset URL from the provider
+  url               String?
+  /// Optional thumbnail for video assets
+  thumbnailUrl      String?
+  /// File size in bytes when downloaded
+  fileSizeBytes     Int?
+  /// MIME type: image/png, video/mp4, etc.
+  mimeType          String?
+  /// Key-value extras from the generation API response
+  metadata          Json?
+  requestId         String              @unique
+  /// Higgsfield request_id for status polling
+  externalRequestId String?
+  /// Who created this generation
+  createdById       String
+  /// When the user initiated generation
+  createdAt         DateTime            @default(now())
+  /// When status became READY (asset available)
+  readyAt           DateTime?
+  /// When the generation failed
+  failedAt          DateTime?
+  /// Download count
+  downloadCount     Int                 @default(0)
+  /// When the asset was last downloaded
+  lastDownloadedAt  DateTime?
+  submissions       ContentSubmission[]
+  brand             Brand?              @relation(fields: [brandId], references: [id])
+  creator           User                @relation("AssetCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([status])
+  @@index([mediaType])
+  @@index([createdById])
+  @@index([organizationId, status, mediaType])
+}
+
+/// A content post linked to a submission, ready to be published to a channel.
+/// Different from SocialPost (which is platform-specific). This is the content
+/// management layer — draft, approve, then publish to SocialPost.
+model Post {
+  id                String             @id @default(cuid())
+  organizationId    String
+  brandId           String
+  /// Which channel to post to: FACEBOOK | INSTAGRAM | WHATSAPP | TIKTOK | LINKEDIN
+  channel           String
+  /// External channel ID if connected
+  externalChannelId String?
+  /// The submission being posted
+  submissionId      String?
+  /// DRAFT | SCHEDULED | PUBLISHING | PUBLISHED | FAILED | ARCHIVED
+  status            String             @default("DRAFT")
+  /// Post caption/copy
+  caption           String
+  /// Media URLs (images, videos) — array of URLs
+  mediaUrls         Json               @default("[]")
+  /// Alt text for each media item
+  altTexts          Json               @default("[]")
+  /// Link to attach (for WhatsApp, landing pages)
+  linkUrl           String?
+  /// UTM params for the link
+  utmParams         Json?
+  /// When to publish (null = immediate)
+  scheduledAt       DateTime?
+  /// When actually published
+  publishedAt       DateTime?
+  /// External post ID from platform
+  externalPostId    String?
+  /// External post URL
+  externalUrl       String?
+  /// Engagement metrics
+  metrics           Json?
+  /// Error if posting failed
+  error             String?
+  /// Creator
+  createdById       String
+  /// Approver
+  approvedById      String?
+  approvedAt        DateTime?
+  /// AI-assisted caption metadata
+  aiMetadata        Json?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  approver          User?              @relation("ContentPostApprover", fields: [approvedById], references: [id])
+  brand             Brand              @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  creator           User               @relation("ContentPostCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  organization      Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  submission        ContentSubmission? @relation(fields: [submissionId], references: [id])
+
+  @@unique([organizationId, submissionId])
+  @@index([organizationId])
+  @@index([brandId])
+  @@index([channel])
+  @@index([status])
+  @@index([scheduledAt])
+  @@index([submissionId])
+}
+
+/// A project or system being monitored
+/// Examples: Agency Platform, IntelliCash Mobile, IntelliCash Admin, etc.
+model Project {
+  id               String               @id @default(cuid())
+  /// Project name (e.g., "Agency Platform", "IntelliCash Mobile")
+  name             String
+  /// Unique slug for URL-friendly reference
+  slug             String               @unique
+  /// Short description
+  description      String?
+  /// Project type: web | mobile | backend | infrastructure | other
+  type             String               @default("other")
+  /// Owner/organization this project belongs to
+  ownerId          String?
+  /// Project status: active | maintenance | archived
+  status           String               @default("active")
+  /// Base URL for the project (e.g., http://localhost:3400)
+  baseUrl          String?
+  /// Health check endpoint (e.g., /api/health)
+  healthEndpoint   String?
+  /// Cron expression for automated health checks (example: every 5 minutes)
+  healthCheckCron  String?
+  /// Last health check timestamp
+  lastHealthCheck  DateTime?
+  /// Last known health status: healthy | degraded | down | unknown
+  lastHealthStatus String               @default("unknown")
+  /// When the project was created
+  createdAt        DateTime             @default(now())
+  /// When the project was last updated
+  updatedAt        DateTime             @updatedAt
+  healthChecks     HealthCheck[]
+  issues           Issue[]
+  integrations     ProjectIntegration[]
+
+  @@index([ownerId])
+  @@index([status])
+  @@index([type])
+}
+
+/// Integration with external systems (LinkedIn, GitHub, etc.)
+model ProjectIntegration {
+  id           String    @id @default(cuid())
+  projectId    String
+  /// Integration type: github | linkedin | telegram | webhook | other
+  type         String
+  /// Integration name (e.g., "GitHub Repo", "LinkedIn Page")
+  name         String
+  /// Configuration data (encrypted as needed)
+  config       Json
+  /// Whether this integration is active
+  enabled      Boolean   @default(true)
+  /// Last sync timestamp
+  lastSyncedAt DateTime?
+  /// Error message from last sync (if any)
+  lastError    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  project      Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([type])
+}
+
+/// An issue, bug, or task tracking item
+model Issue {
+  id               String         @id @default(cuid())
+  /// Issue reference number (e.g., "BUG-0001", "ISSUE-0001")
+  issueNumber      String         @unique
+  /// The project this issue belongs to
+  projectId        String
+  /// Issue title (short summary)
+  title            String
+  /// Detailed description
+  description      String?
+  /// Issue type: bug | feature | improvement | task | incident
+  type             String         @default("bug")
+  /// Priority level: low | medium | high | critical | urgent
+  priority         String         @default("medium")
+  /// Current status: open | in_progress | in_review | resolved | closed | wont_fix
+  status           String         @default("open")
+  /// Severity: info | minor | major | critical | blocker
+  severity         String         @default("major")
+  /// Who reported the issue
+  reporterId       String?
+  /// Who is currently assigned
+  assigneeId       String?
+  /// Who resolved the issue (if applicable)
+  resolvedById     String?
+  /// When the issue was resolved
+  resolvedAt       DateTime?
+  /// Root cause analysis or notes
+  rootCause        String?
+  /// Resolution notes
+  resolution       String?
+  /// Environment where the issue occurred: production | staging | development | unknown
+  environment      String         @default("unknown")
+  /// Steps to reproduce
+  stepsToReproduce String?
+  /// Expected behavior
+  expectedBehavior String?
+  /// Actual behavior observed
+  actualBehavior   String?
+  /// Attachments (screenshots, logs) as URLs
+  attachments      String[]       @default([])
+  /// Tags for categorization
+  tags             String[]       @default([])
+  /// Links to related issues
+  relatedIssueIds  String[]       @default([])
+  /// When the issue was created
+  createdAt        DateTime       @default(now())
+  /// When the issue was last updated
+  updatedAt        DateTime       @updatedAt
+  project          Project        @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  comments         IssueComment[]
+  history          IssueHistory[]
+
+  @@index([projectId])
+  @@index([status])
+  @@index([priority])
+  @@index([assigneeId])
+  @@index([createdAt])
+  @@index([projectId, status, priority])
+}
+
+/// Comment on an issue
+model IssueComment {
+  id          String   @id @default(cuid())
+  issueId     String
+  authorId    String
+  body        String
+  /// Attachment URLs
+  attachments String[] @default([])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  issue       Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([authorId])
+  @@index([issueId, createdAt])
+}
+
+/// History of status changes and important events
+model IssueHistory {
+  id        String   @id @default(cuid())
+  issueId   String
+  action    String
+  from      String?
+  to        String?
+  note      String?
+  authorId  String?
+  createdAt DateTime @default(now())
+  issue     Issue    @relation(fields: [issueId], references: [id], onDelete: Cascade)
+
+  @@index([issueId])
+  @@index([issueId, createdAt])
+}
+
+/// Automated health check results
+model HealthCheck {
+  id             String   @id @default(cuid())
+  projectId      String
+  /// Status: healthy | degraded | down | unknown
+  status         String
+  /// HTTP status code if applicable
+  httpStatus     Int?
+  /// Response time in milliseconds
+  responseTimeMs Int?
+  /// Error message if any
+  errorMessage   String?
+  /// Check details (JSON)
+  details        Json?
+  /// When the check was performed
+  checkedAt      DateTime @default(now())
+  project        Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+  @@index([status])
+  @@index([checkedAt])
+}
+
+/// Dashboard widget configuration
+model DashboardWidget {
+  id              String         @id @default(cuid())
+  /// Widget name: issue_summary | health_overview | recent_activity | priority_breakdown
+  widgetType      String
+  /// Display title
+  title           String
+  /// Filter criteria (JSON)
+  filters         Json           @default("{}")
+  /// Sort order in dashboard
+  sortOrder       Int            @default(0)
+  /// Whether widget is visible
+  visible         Boolean        @default(true)
+  /// Widget size: small | medium | large | full
+  size            String         @default("medium")
+  userDashboardId String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  userDashboard   UserDashboard? @relation(fields: [userDashboardId], references: [id], onDelete: Cascade)
+
+  @@index([widgetType])
+}
+
+/// Dashboard customizations per user
+model UserDashboard {
+  id            String            @id @default(cuid())
+  userId        String            @unique
+  dashboardName String            @default("Default")
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  widgets       DashboardWidget[]
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
