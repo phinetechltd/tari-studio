@@ -49,6 +49,7 @@ const PUBLIC_ALLOWLIST = new Set([
   // Paystack's webhook: every POST must carry a valid x-paystack-signature, and
   // then only triggers a verify by reference (src/server/payments.ts).
   "api/webhooks/paystack",
+  "api/webhooks/tiktok",
   // The Paystack simulator's checkout: refused unless PAYSTACK_PROVIDER=simulator
   // outside production; it records a pretend outcome and triggers a verify.
   "api/payments/paystack/simulator",

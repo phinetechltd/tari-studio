@@ -1,12 +1,13 @@
 "use client";
 
-import { CircleX, Download, FastForward, LoaderIcon, Pencil, RotateCcw, Sparkles, Wand2 } from "lucide-react";
+import { CircleX, Download, FastForward, LoaderIcon, Pencil, Repeat, RotateCcw, Sparkles, Wand2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { formatKES } from "@/lib/money";
 import { ASPECT_RATIOS, FAMILIES, modelCredits, secondsLabel, type CatalogueModel, type GenerationMode } from "@/lib/generation-models";
 import { creditsToCents, VIDEO_MAX_SECONDS, VIDEO_MIN_SECONDS } from "@/lib/pricing";
 import type { Pricing } from "@/lib/pricing";
+import { IMPROVE_IDEAS } from "@/lib/studio-context";
 import { costOf } from "@/lib/studio-intent";
 import { cn } from "@/lib/utils";
 
@@ -168,6 +169,21 @@ export function QuoteCard({
         </p>
       )}
 
+      {meta.using && (meta.using.labels.length > 0 || meta.using.start) && (
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs" aria-label="What this uses">
+          {meta.using.labels.map((l) => (
+            <span key={l} className="rounded-full border border-wash/10 bg-wash/[0.06] px-2.5 py-1 text-ink/70">{l}</span>
+          ))}
+          {meta.using.start && (
+            <span className="flex items-center gap-2 rounded-full border border-primary/40 bg-primary/10 py-0.5 pl-0.5 pr-3 text-ink/80">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={meta.using.start.thumb} alt="" className="h-6 w-6 rounded-full object-cover" />
+              {isVideo && meta.mode !== "extend" ? `Video starts from ${meta.using.start.label}` : "Picture used for video only"}
+            </span>
+          )}
+        </div>
+      )}
+
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         {options.length > 0 && (
           <div className="sm:col-span-2">
@@ -287,6 +303,7 @@ export function QuoteCard({
         )}
         {derived && <span className="self-center text-xs text-ink/40">{MODE_LABEL[meta.mode]}</span>}
       </div>
+
     </div>
   );
 }
@@ -306,15 +323,23 @@ export function GenerationCard({
   asset,
   onDerive,
   onAgain,
+  onImprove,
+  onAutomate,
   onMediaLoaded,
 }: {
   asset: AssetView;
   onDerive: (mode: "animate" | "extend") => Promise<void>;
   onAgain: () => Promise<void>;
+  /** Makes a new quote from this result with the person's suggestions added */
+  onImprove?: (suggestions: string) => Promise<void>;
+  /** Opens Autopilot set up from this result */
+  onAutomate?: () => void;
   onMediaLoaded?: () => void;
 }) {
   const elapsed = useElapsed(asset.createdAt, asset.status === "GENERATING");
   const [busy, setBusy] = useState(false);
+  const [improving, setImproving] = useState(false);
+  const [suggestion, setSuggestion] = useState("");
   const run = async (fn: () => Promise<void>) => {
     setBusy(true);
     try {
@@ -388,12 +413,106 @@ export function GenerationCard({
             <FastForward className="h-3.5 w-3.5" /> Extend
           </button>
         )}
+        {asset.status === "READY" && onImprove && (
+          <button type="button" disabled={busy} aria-expanded={improving} onClick={() => setImproving((v) => !v)} className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-3 text-xs text-ink/80 hover:bg-wash/[0.06]">
+            <Sparkles className="h-3.5 w-3.5" /> Improve
+          </button>
+        )}
+        {asset.status === "READY" && onAutomate && (
+          <button type="button" disabled={busy} onClick={onAutomate} className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-3 text-xs text-ink/80 hover:bg-wash/[0.06]">
+            <Repeat className="h-3.5 w-3.5" /> Make this automatic
+          </button>
+        )}
         {asset.status !== "GENERATING" && (
           <button type="button" disabled={busy} onClick={() => void run(onAgain)} className="inline-flex min-h-[36px] items-center gap-1 rounded-lg px-3 text-xs text-ink/80 hover:bg-wash/[0.06]">
             <RotateCcw className="h-3.5 w-3.5" /> {asset.status === "FAILED" ? "Try again" : "Another take"}
           </button>
         )}
       </div>
+
+      {improving && onImprove && (
+        <div className="border-t border-wash/[0.06] p-3">
+          <p className="text-xs text-ink/60">What should be different? Tap ideas or write your own. You see the new price before anything is charged.</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {IMPROVE_IDEAS.map((idea) => (
+              <button
+                key={idea}
+                type="button"
+                className="rounded-full border border-wash/10 px-2.5 py-1 text-xs text-ink/70 hover:border-primary/50 hover:text-ink"
+                onClick={() => setSuggestion((s) => (s.toLowerCase().includes(idea.toLowerCase()) ? s : `${s}${s.trim() ? ", " : ""}${idea.toLowerCase()}`))}
+              >
+                + {idea}
+              </button>
+            ))}
+          </div>
+          <label className="sr-only" htmlFor={`improve-${asset.id}`}>Suggestions</label>
+          <textarea
+            id={`improve-${asset.id}`}
+            className="mt-2 min-h-[64px] w-full rounded-lg border border-wash/10 bg-wash/[0.05] p-2 text-sm text-ink/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
+            value={suggestion}
+            maxLength={500}
+            onChange={(e) => setSuggestion(e.target.value)}
+            placeholder="e.g. warmer light, slower camera, show the price tag"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              className="min-h-[36px] rounded-lg bg-primary px-3 text-xs font-medium text-onprimary disabled:opacity-50"
+              disabled={busy || suggestion.trim().length < 3}
+              onClick={() => void run(async () => {
+                await onImprove(suggestion);
+                setSuggestion("");
+                setImproving(false);
+              })}
+            >
+              Make a new quote
+            </button>
+            <button type="button" className="min-h-[36px] rounded-lg px-3 text-xs text-ink/60" onClick={() => setImproving(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {improving && onImprove && (
+        <div className="border-t border-wash/[0.06] p-3">
+          <p className="text-xs text-ink/60">What should be different? Tap ideas or write your own. You see the new price before anything is charged.</p>
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {IMPROVE_IDEAS.map((idea) => (
+              <button
+                key={idea}
+                type="button"
+                className="rounded-full border border-wash/10 px-2.5 py-1 text-xs text-ink/70 hover:border-primary/50 hover:text-ink"
+                onClick={() => setSuggestion((s) => (s.toLowerCase().includes(idea.toLowerCase()) ? s : `${s}${s.trim() ? ", " : ""}${idea.toLowerCase()}`))}
+              >
+                + {idea}
+              </button>
+            ))}
+          </div>
+          <label className="sr-only" htmlFor={`improve-${asset.id}`}>Suggestions</label>
+          <textarea
+            id={`improve-${asset.id}`}
+            className="mt-2 min-h-[64px] w-full rounded-lg border border-wash/10 bg-wash/[0.05] p-2 text-sm text-ink/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
+            value={suggestion}
+            maxLength={500}
+            onChange={(e) => setSuggestion(e.target.value)}
+            placeholder="e.g. warmer light, slower camera, show the price tag"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              type="button"
+              className="min-h-[36px] rounded-lg bg-primary px-3 text-xs font-medium text-onprimary disabled:opacity-50"
+              disabled={busy || suggestion.trim().length < 3}
+              onClick={() => void run(async () => {
+                await onImprove(suggestion);
+                setSuggestion("");
+                setImproving(false);
+              })}
+            >
+              Make a new quote
+            </button>
+            <button type="button" className="min-h-[36px] rounded-lg px-3 text-xs text-ink/60" onClick={() => setImproving(false)}>Cancel</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

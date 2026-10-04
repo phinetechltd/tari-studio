@@ -55,7 +55,11 @@ model Organization {
   automations      Automation[]
   automationRuns   AutomationRun[]
   subscription     Subscription?
+  templates        Template[]
+  externalAccounts ExternalAccount[]
   characters       Character[]
+  autopilots       Autopilot[]
+  autopilotRuns    AutopilotRun[]
 }
 
 /// The licensing gate: a module the tenant has bought. Read on every request,
@@ -359,7 +363,7 @@ model AiUsage {
 
 /// A client brand. Each brand has its own catalogue, content, and social accounts.
 model Brand {
-  id              String           @id @default(cuid())
+  id              String            @id @default(cuid())
   organizationId  String
   name            String
   slug            String
@@ -369,26 +373,35 @@ model Brand {
   guidelines      Json?
   /// Brand avatar/logo URL
   avatarUrl       String?
+  /// A short line the brand is known for; used in captions and prompts
+  slogan          String?
+  /// Uploaded cover image and logo (stored files; the avatarUrl above stays for external links)
+  coverImageKey   String?
+  coverMimeType   String?
+  logoKey         String?
+  logoMimeType    String?
+  attachments     BrandAttachment[]
+  autopilots      Autopilot[]
   /// Primary contact for this brand
   contactName     String?
   contactEmail    String?
   contactPhone    String?
   website         String?
   /// IANA timezone, e.g. Africa/Nairobi
-  timezone        String           @default("Africa/Nairobi")
+  timezone        String            @default("Africa/Nairobi")
   /// Default currency code, e.g. KES, USD
-  defaultCurrency String           @default("KES")
+  defaultCurrency String            @default("KES")
   /// ACTIVE | ARCHIVED
-  status          String           @default("ACTIVE")
+  status          String            @default("ACTIVE")
   archivedAt      DateTime?
   /// Brand-level AI settings override
   aiOverrides     Json?
   createdById     String?
-  createdAt       DateTime         @default(now())
-  updatedAt       DateTime         @updatedAt
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
   aiUsage         AiUsage[]
-  creator         User?            @relation("BrandCreator", fields: [createdById], references: [id])
-  organization    Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  creator         User?             @relation("BrandCreator", fields: [createdById], references: [id])
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   campaigns       Campaign[]
   catalogueItems  CatalogueItem[]
   tasks           ContentTask[]
@@ -408,7 +421,7 @@ model Brand {
 
 /// A product or service in a brand's catalogue.
 model CatalogueItem {
-  id             String       @id @default(cuid())
+  id             String          @id @default(cuid())
   brandId        String
   /// Denormalized for tenant queries
   organizationId String
@@ -422,16 +435,29 @@ model CatalogueItem {
   /// Category for grouping
   category       String?
   /// Tags for search/filter
-  tags           Json         @default("[]")
+  tags           Json            @default("[]")
   /// ACTIVE | ARCHIVED
-  status         String       @default("ACTIVE")
+  status         String          @default("ACTIVE")
   archivedAt     DateTime?
   metadata       Json?
+  /// Whether the shop counts units of this product
+  trackStock     Boolean         @default(false)
+  stockQty       Int?
+  /// Warn the team when stock falls to this number or below
+  lowStockAt     Int?
+  /// "piece", "kg", "box"...
+  unit           String?
+  /// Where to buy or read more
+  url            String?
+  /// Extra details as name/value pairs: size, colour, ingredients...
+  attributes     Json            @default("{}")
   createdById    String?
-  createdAt      DateTime     @default(now())
-  updatedAt      DateTime     @updatedAt
-  brand          Brand        @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  brand          Brand           @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  images         ProductImage[]
+  movements      StockMovement[]
 
   @@index([brandId])
   @@index([organizationId])
@@ -559,36 +585,41 @@ model Comment {
 
 /// A connected social media account (Facebook Page, Instagram, WhatsApp)
 model SocialChannel {
-  id             String         @id @default(cuid())
-  organizationId String
-  brandId        String
+  id               String         @id @default(cuid())
+  organizationId   String
+  brandId          String
   /// FACEBOOK | INSTAGRAM | WHATSAPP | TWITTER | LINKEDIN | TIKTOK
-  platform       String
+  platform         String
   /// Platform account id (external)
-  externalId     String?
-  name           String
+  externalId       String?
+  name             String
   /// Handle/username on the platform
-  handle         String?
+  handle           String?
   /// Access token (encrypted at rest)
-  tokenCipher    String?
-  tokenIv        String?
-  tokenTag       String?
+  tokenCipher      String?
+  tokenIv          String?
+  tokenTag         String?
   /// Token expiry
-  tokenExpiresAt DateTime?
+  tokenExpiresAt   DateTime?
+  /// Refresh token, sealed like the access token (TikTok access tokens last a day)
+  refreshCipher    String?
+  refreshIv        String?
+  refreshTag       String?
+  refreshExpiresAt DateTime?
   /// ACTIVE | DISCONNECTED | EXPIRED | ERROR
-  status         String         @default("ACTIVE")
-  archivedAt     DateTime?
+  status           String         @default("ACTIVE")
+  archivedAt       DateTime?
   /// Channel-level metadata (page id, permissions, etc.)
-  metadata       Json?
-  connectedById  String?
-  connectedAt    DateTime       @default(now())
-  lastUsedAt     DateTime?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
-  brand          Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
-  organization   Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  posts          SocialPost[]
-  conversations  Conversation[]
+  metadata         Json?
+  connectedById    String?
+  connectedAt      DateTime       @default(now())
+  lastUsedAt       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  brand            Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  posts            SocialPost[]
+  conversations    Conversation[]
 
   @@index([organizationId])
   @@index([brandId])
@@ -1603,36 +1634,93 @@ model AutomationRun {
 /// of reference images that every agency can browse and use in the Studio.
 /// Global (not per organisation).
 model Template {
-  id          String          @id @default(cuid())
-  title       String
-  slug        String          @unique
-  description String
-  category    String?
+  id             String          @id @default(cuid())
+  title          String
+  slug           String          @unique
+  description    String
+  category       String?
   /// Text put in front of the prompt when this template is used (optional)
-  promptHint  String?
+  promptHint     String?
   /// DRAFT | PUBLISHED
-  status      String          @default("DRAFT")
-  createdById String?
-  createdAt   DateTime        @default(now())
-  updatedAt   DateTime        @updatedAt
-  images      TemplateImage[]
+  status         String          @default("DRAFT")
+  /// The organisation that made it; null for the platform team's templates
+  organizationId String?
+  /// PRIVATE (its organisation only) | PUBLIC (every organisation). Platform templates are PUBLIC.
+  visibility     String          @default("PUBLIC")
+  /// A platform admin took a public template out of the shared list (it stays usable by its own organisation)
+  hiddenAt       DateTime?
+  hiddenReason   String?
+  hiddenById     String?
+  createdById    String?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  images         TemplateImage[]
+  organization   Organization?   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@index([status, updatedAt])
+  @@index([organizationId, updatedAt])
+  @@index([visibility, status])
 }
 
 model TemplateImage {
-  id            String   @id @default(cuid())
-  templateId    String
+  id               String   @id @default(cuid())
+  templateId       String
   /// Path under storage/ (server-generated, never from the upload)
-  storageKey    String
-  mimeType      String
-  fileSizeBytes Int
-  caption       String?
-  sortOrder     Int      @default(0)
-  createdAt     DateTime @default(now())
-  template      Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  storageKey       String
+  mimeType         String
+  fileSizeBytes    Int
+  caption          String?
+  sortOrder        Int      @default(0)
+  /// Where it came from: null (uploaded) | PINTEREST
+  sourceProvider   String?
+  /// The pin's page, for the credit link
+  sourceUrl        String?
+  sourceExternalId String?
+  sourceAuthor     String?
+  sourceAuthorUrl  String?
+  /// False for someone else's pin: such an image keeps its template private
+  sourceOwned      Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  template         Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
 
   @@index([templateId, sortOrder])
+}
+
+/// An organisation's sign-in to a service that is not a publishing channel:
+/// Pinterest (to search its own pins and boards for templates) and TikTok's
+/// Business API (to read and answer comments on a connected TikTok account).
+/// Tokens are sealed with the organisation id as additional data.
+model ExternalAccount {
+  id               String       @id @default(cuid())
+  organizationId   String
+  /// PINTEREST | TIKTOK_BUSINESS
+  provider         String
+  /// TIKTOK_BUSINESS: the TikTok channel whose comments it answers
+  channelId        String?
+  externalId       String
+  name             String
+  handle           String?
+  accessCipher     String
+  accessIv         String
+  accessTag        String
+  accessExpiresAt  DateTime?
+  refreshCipher    String?
+  refreshIv        String?
+  refreshTag       String?
+  refreshExpiresAt DateTime?
+  scopes           String[]     @default([])
+  /// ACTIVE | DISCONNECTED
+  status           String       @default("ACTIVE")
+  /// Provider bookkeeping, e.g. the newest comment already seen
+  metadata         Json?
+  connectedById    String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider, externalId])
+  @@index([provider, status])
+  @@index([channelId])
 }
 
 /// A recurring character (a mascot, a model, a persona) an agency keeps
@@ -1674,6 +1762,140 @@ model CharacterImage {
   @@index([characterId, sortOrder])
 }
 
+/// A picture of a product. Stored like a character's images.
+model ProductImage {
+  id            String        @id @default(cuid())
+  productId     String
+  storageKey    String
+  mimeType      String
+  fileSizeBytes Int
+  sortOrder     Int           @default(0)
+  createdAt     DateTime      @default(now())
+  product       CatalogueItem @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, sortOrder])
+}
+
+/// Every change to a tracked product's stock, so the count can always be explained.
+model StockMovement {
+  id             String        @id @default(cuid())
+  productId      String
+  /// Denormalized for tenant queries
+  organizationId String
+  /// Units added (positive) or removed (negative)
+  delta          Int
+  /// RESTOCK | SALE | ADJUSTMENT | DAMAGED | RETURN | INITIAL
+  reason         String
+  note           String?
+  balanceAfter   Int
+  userId         String?
+  createdAt      DateTime      @default(now())
+  product        CatalogueItem @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+/// A file kept with a brand: a second picture, a style guide PDF, a price list.
+model BrandAttachment {
+  id             String   @id @default(cuid())
+  brandId        String
+  organizationId String
+  /// IMAGE | DOCUMENT
+  kind           String
+  label          String
+  fileName       String
+  storageKey     String
+  mimeType       String
+  fileSizeBytes  Int
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+  brand          Brand    @relation(fields: [brandId], references: [id], onDelete: Cascade)
+
+  @@index([brandId, sortOrder])
+}
+
+/// A picture already uploaded to Higgsfield (their presigned-upload flow), remembered by the
+/// picture's hash so the same file is not sent twice. Their upload links last an hour; we
+/// reuse the returned public URL only until it is older than `expiresAt`.
+model ProviderFile {
+  id        String   @id @default(cuid())
+  sha256    String
+  provider  String   @default("HIGGSFIELD")
+  url       String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@unique([provider, sha256])
+  @@index([expiresAt])
+}
+
+/// A standing instruction to make content on a schedule and post it (or hold it for approval).
+model Autopilot {
+  id                  String         @id @default(cuid())
+  organizationId      String
+  brandId             String
+  name                String
+  enabled             Boolean        @default(false)
+  /// APPROVE_FIRST | AUTO_POST
+  mode                String         @default("APPROVE_FIRST")
+  /// IMAGE | VIDEO
+  contentKind         String         @default("IMAGE")
+  seconds             Int?
+  aspectRatio         String         @default("1:1")
+  productIds          String[]
+  characterIds        String[]
+  templateId          String?
+  channelIds          String[]
+  /// What the posts should be about / how they should feel, in the owner's words
+  guidance            String         @default("")
+  /// { days: [1..7 Mon..Sun], times: ["09:00"] } in `timezone`
+  schedule            Json
+  timezone            String         @default("Africa/Nairobi")
+  nextRunAt           DateTime?
+  lastRunAt           DateTime?
+  /// Most credits the autopilot may spend in a calendar month; null = no cap
+  monthlyCreditCap    Int?
+  consecutiveFailures Int            @default(0)
+  /// Why it switched itself off, shown to the owner
+  pausedReason        String?
+  rotation            Int            @default(0)
+  createdById         String
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+  organization        Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  brand               Brand          @relation(fields: [brandId], references: [id], onDelete: Cascade)
+  runs                AutopilotRun[]
+
+  @@index([organizationId, enabled])
+  @@index([enabled, nextRunAt])
+}
+
+/// One scheduled occasion of an autopilot. `slotKey` makes a slot happen once however often the job is delivered.
+model AutopilotRun {
+  id             String       @id @default(cuid())
+  autopilotId    String
+  organizationId String
+  /// ISO time of the schedule slot this run is for
+  slotKey        String
+  /// PLANNED | GENERATING | AWAITING_APPROVAL | SCHEDULED | PUBLISHED | REJECTED | SKIPPED | FAILED
+  status         String       @default("PLANNED")
+  assetId        String?
+  postIds        String[]
+  caption        String?
+  /// Why it was skipped or failed, or what it is waiting for
+  reason         String?
+  creditsSpent   Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  autopilot      Autopilot    @relation(fields: [autopilotId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([autopilotId, slotKey])
+  @@index([organizationId, status])
+  @@index([autopilotId, createdAt])
+}
+
 /// Which characters take part in a campaign.
 model CampaignCharacter {
   campaignId  String
@@ -1685,7 +1907,6 @@ model CampaignCharacter {
   @@id([campaignId, characterId])
   @@index([characterId])
 }
-
 
 /// A way of signing in that is not a password: today Google.
 model AuthIdentity {

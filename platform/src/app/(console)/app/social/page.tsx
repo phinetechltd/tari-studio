@@ -4,13 +4,16 @@ import Link from "next/link";
 
 import { Hint } from "@/components/hints/hint";
 import { ChannelActions, Composer, PostActions } from "@/components/social/social-controls";
+import { TikTokCommentControls } from "@/components/social/tiktok-controls";
 import { Badge, EmptyState, Notice, PageHeader, SectionTitle, formatDateTime } from "@/components/ui";
 import { titleCase } from "@/lib/campaign-labels";
 import { db } from "@/lib/db";
 import { can } from "@/lib/rbac";
 import { requirePermission } from "@/lib/session";
+import { configuredProviderName } from "@/lib/providers";
 import { cn } from "@/lib/utils";
 import { isSimulated } from "@/server/meta";
+import { tikTokCommentsAvailable } from "@/server/tiktok";
 import { listChannels, listPosts } from "@/server/social";
 
 export const metadata: Metadata = { title: "Social" };
@@ -20,6 +23,7 @@ const PLATFORM: Record<string, { label: string; className: string }> = {
   FACEBOOK: { label: "Facebook", className: "bg-[#1877F2]/15 text-[#6ea8ff]" },
   INSTAGRAM: { label: "Instagram", className: "bg-[#E1306C]/15 text-[#ff7ab6]" },
   WHATSAPP: { label: "WhatsApp", className: "bg-[#25D366]/15 text-[#5DF3D7]" },
+  TIKTOK: { label: "TikTok", className: "bg-white/10 text-ink" },
 };
 
 const POST_TONE: Record<string, "success" | "danger" | "warning" | "neutral" | "info"> = {
@@ -29,13 +33,14 @@ const POST_TONE: Record<string, "success" | "danger" | "warning" | "neutral" | "
   SCHEDULED: "warning",
 };
 
-export default async function SocialPage({ searchParams }: { searchParams: Promise<{ connect?: string; count?: string; reason?: string }> }) {
+export default async function SocialPage({ searchParams }: { searchParams: Promise<{ connect?: string; count?: string; reason?: string; platform?: string; comments?: string }> }) {
   const { principal, organizationId } = await requirePermission("channel:read");
-  const { connect, count, reason } = await searchParams;
+  const { connect, count, reason, platform, comments } = await searchParams;
+  const network = platform === "tiktok" ? "TikTok" : "Facebook";
   const canPost = can(principal, "post:schedule");
   const canConnect = can(principal, "channel:connect");
 
-  const [channels, posts, assets, campaigns] = await Promise.all([
+  const [channels, posts, assets, campaigns, commentLinks] = await Promise.all([
     listChannels(principal),
     can(principal, "post:read") ? listPosts(principal) : Promise.resolve([]),
     canPost && can(principal, "ai:generate")
@@ -49,7 +54,11 @@ export default async function SocialPage({ searchParams }: { searchParams: Promi
     canPost
       ? db.campaign.findMany({ where: { organizationId, status: { in: ["DRAFT", "ACTIVE", "PAUSED"] } }, select: { id: true, name: true, brandId: true }, orderBy: { createdAt: "desc" } })
       : Promise.resolve([]),
+    db.externalAccount.findMany({ where: { organizationId, provider: "TIKTOK_BUSINESS", status: "ACTIVE" }, select: { channelId: true, handle: true, metadata: true } }),
   ]);
+  const commentsFor = new Map(commentLinks.map((l) => [l.channelId ?? "", l]));
+  const commentsAvailable = tikTokCommentsAvailable();
+  const tiktokSimulated = configuredProviderName("TIKTOK") === "simulator";
   const publishable = channels
     .filter((c) => c.status === "ACTIVE" && c.platform !== "WHATSAPP")
     .map((c) => ({ id: c.id, name: c.name, platform: c.platform, brandId: c.brandId, brandName: c.brand.name }));
@@ -58,7 +67,7 @@ export default async function SocialPage({ searchParams }: { searchParams: Promi
     <>
       <PageHeader
         title="Social"
-        subtitle="Your Facebook Pages, Instagram accounts and WhatsApp numbers, and everything scheduled to go out."
+        subtitle="Your Facebook Pages, Instagram, TikTok accounts and WhatsApp numbers, and everything scheduled to go out."
         actions={
           canConnect ? (
             <Link href="/app/social/new" className="btn-primary">
@@ -72,10 +81,17 @@ export default async function SocialPage({ searchParams }: { searchParams: Promi
       </Hint>
 
       {connect === "ok" ? <Notice tone="success" title={`Connected ${count ?? ""} account${count === "1" ? "" : "s"}.`} /> : null}
-      {connect === "cancelled" ? <Notice tone="warning" title="Facebook connection was cancelled." /> : null}
+      {connect === "cancelled" ? <Notice tone="warning" title={`${network} connection was cancelled.`} /> : null}
       {connect === "expired" ? <Notice tone="warning" title="That connection link expired or was started elsewhere. Try again." /> : null}
       {connect === "nopages" ? <Notice tone="warning" title="No Facebook Pages were shared. Choose at least one Page when Facebook asks." /> : null}
-      {connect === "failed" ? <Notice tone="danger" title="Facebook did not complete the connection.">{reason}</Notice> : null}
+      {connect === "failed" ? <Notice tone="danger" title="The connection did not complete.">{reason}</Notice> : null}
+      {comments === "ok" ? <Notice tone="success" title="TikTok comment replies are on. New comments are checked every few minutes." /> : null}
+      {comments === "failed" || comments === "expired" || comments === "cancelled" ? (
+        <Notice tone="warning" title="TikTok comment replies were not switched on.">{comments === "failed" ? reason : comments === "expired" ? "The sign-in took too long or was started elsewhere. Try again." : "The sign-in was cancelled."}</Notice>
+      ) : null}
+      {tiktokSimulated && channels.some((c) => c.platform === "TIKTOK") ? (
+        <Notice tone="info" title="TikTok is in simulator mode">Posts and comments are simulated. A platform admin switches TikTok to Live in Settings → TikTok.</Notice>
+      ) : null}
       {isSimulated() ? (
         <Notice tone="info" title="Meta is in simulator mode">
           Connections and posts are simulated so you can try everything end to end. Set META_PROVIDER=graph with your Meta app to go live.
@@ -123,6 +139,16 @@ export default async function SocialPage({ searchParams }: { searchParams: Promi
                     {c.platform === "WHATSAPP" ? `${c._count.conversations} conversation${c._count.conversations === 1 ? "" : "s"}` : `${c._count.posts} post${c._count.posts === 1 ? "" : "s"}`}
                     {meta.lastCheck ? ` · checked ${formatDateTime(meta.lastCheck.at)}` : ""}
                   </p>
+                  {c.platform === "TIKTOK" && c.status === "ACTIVE" ? (
+                    <TikTokCommentControls
+                      channelId={c.id}
+                      connected={commentsFor.has(c.id)}
+                      handle={commentsFor.get(c.id)?.handle ?? null}
+                      lastError={((commentsFor.get(c.id)?.metadata ?? {}) as { lastError?: string | null }).lastError ?? null}
+                      available={commentsAvailable}
+                      canConnect={canConnect}
+                    />
+                  ) : null}
                   <ChannelActions channelId={c.id} canDisconnect={canConnect} />
                 </li>
               );

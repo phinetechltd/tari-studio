@@ -7,11 +7,14 @@ import { db } from "@/lib/db";
 import { formatKES } from "@/lib/money";
 import { ASPECT_RATIOS, fitQuote, isAspectRatio, MODES, secondsAllowed, secondsLabel, FAMILIES, type CatalogueModel } from "@/lib/generation-models";
 import { creditsToCents, VIDEO_MAX_SECONDS, VIDEO_MIN_SECONDS, type Pricing } from "@/lib/pricing";
+import { startImageThumb, type QuoteUsing, type StartImageRef } from "@/lib/studio-context";
 import { DEFAULT_VIDEO_SECONDS, interpret, type Intent } from "@/lib/studio-intent";
 
 import { modelByKey, modelsForMode, resolveModel } from "./ai-models";
 import { assetView, creditsFor, requestGeneration, type AssetView } from "./generation";
 import { promptCharacters } from "./characters";
+import { promptProduct } from "./products";
+import { defaultStartImage, storageKeyFor } from "./reference-images";
 import { getPricing } from "./pricing-store";
 import { templateContext } from "./templates";
 
@@ -36,6 +39,14 @@ export interface QuoteMeta extends Intent {
   characterIds?: string[];
   /** The campaign the creative is for */
   campaignId?: string | null;
+  /** The brand whose name, slogan and voice go into the prompt */
+  brandId?: string | null;
+  /** The product whose name, description and details go into the prompt */
+  productId?: string | null;
+  /** The picture that starts a video; null = words only. Chosen from the pictures of the items above. */
+  startImage?: StartImageRef | null;
+  /** Names and picture shown on the quote card; written when the quote is made */
+  using?: QuoteUsing;
 }
 
 export { interpret };
@@ -45,22 +56,83 @@ export interface PromptContext {
   templateId?: string | null;
   characterIds?: string[];
   campaignId?: string | null;
+  brandId?: string | null;
+  productId?: string | null;
+  /** undefined = the first available picture; null = words only */
+  startImage?: StartImageRef | null;
 }
 
 /** Checks a context against the organisation, dropping anything that is not theirs or not available. */
-async function resolveContext(organizationId: string, ctx: PromptContext | undefined): Promise<Pick<QuoteMeta, "templateId" | "characterIds" | "campaignId">> {
+export async function resolveContext(organizationId: string, ctx: PromptContext | undefined): Promise<Pick<QuoteMeta, "templateId" | "characterIds" | "campaignId" | "brandId" | "productId" | "startImage">> {
   if (!ctx) return {};
-  const template = ctx.templateId ? await templateContext(ctx.templateId) : null;
+  const template = ctx.templateId ? await templateContext(ctx.templateId, organizationId) : null;
   const characters = ctx.characterIds?.length ? await promptCharacters(organizationId, ctx.characterIds) : [];
   const campaign = ctx.campaignId ? await db.campaign.findFirst({ where: { id: ctx.campaignId, organizationId }, select: { id: true } }) : null;
-  return { templateId: template?.id ?? null, characterIds: characters.map((c) => c.id), campaignId: campaign?.id ?? null };
+  const product = ctx.productId ? await promptProduct(organizationId, ctx.productId) : null;
+  // A product brings its brand along when none was picked.
+  const brandId = ctx.brandId ?? product?.brandId ?? null;
+  const brand = brandId ? await db.brand.findFirst({ where: { id: brandId, organizationId, status: "ACTIVE" }, select: { id: true } }) : null;
+  const resolved = {
+    templateId: template?.id ?? null,
+    characterIds: characters.map((c) => c.id),
+    campaignId: campaign?.id ?? null,
+    brandId: brand?.id ?? null,
+    productId: product?.id ?? null,
+  };
+  // The starting picture: the person's choice if it is still one of theirs, words only if they chose that, else the best available.
+  let startImage: StartImageRef | null;
+  if (ctx.startImage === null) startImage = null;
+  else if (ctx.startImage && (await storageKeyFor(organizationId, ctx.startImage, resolved))) startImage = ctx.startImage;
+  else startImage = await defaultStartImage(organizationId, resolved);
+  return { ...resolved, startImage };
 }
 
-/** The prompt that is sent to the model: template text, then each character, then what the user wrote. */
+/** The names a quote draws on and the picture a video starts from, for the quote card. */
+async function describeContext(organizationId: string, meta: QuoteMeta): Promise<QuoteUsing> {
+  const labels: string[] = [];
+  const [brand, product, characters, template] = await Promise.all([
+    meta.brandId ? db.brand.findFirst({ where: { id: meta.brandId, organizationId }, select: { name: true } }) : null,
+    meta.productId ? promptProduct(organizationId, meta.productId) : null,
+    meta.characterIds?.length ? promptCharacters(organizationId, meta.characterIds) : [],
+    meta.templateId ? templateContext(meta.templateId, organizationId) : null,
+  ]);
+  if (brand) labels.push(`Brand: ${brand.name}`);
+  if (product) labels.push(`Product: ${product.name}`);
+  for (const c of characters) labels.push(`Character: ${c.name}`);
+  if (template) labels.push(`Template: ${template.title}`);
+  const thumb = meta.startImage ? startImageThumb(meta.startImage, meta.brandId) : null;
+  const sourceLabel = meta.startImage ? ({ product: product?.name, character: characters[0]?.name, brand: brand ? `${brand.name} ${meta.startImage.id}` : undefined, template: template?.title } as Record<string, string | undefined>)[meta.startImage.source] : undefined;
+  return { labels, start: thumb ? { thumb, label: sourceLabel ?? "your picture" } : null };
+}
+
+/** One line each for the brand and the product; names, words and details only (no prices or stock). */
+async function brandAndProductText(organizationId: string, meta: QuoteMeta): Promise<string[]> {
+  const out: string[] = [];
+  if (meta.brandId) {
+    const b = await db.brand.findFirst({ where: { id: meta.brandId, organizationId }, select: { name: true, slogan: true, guidelines: true } });
+    if (b) {
+      const g = (b.guidelines ?? {}) as Record<string, unknown>;
+      const voice = typeof g.voice === "string" ? g.voice.trim() : "";
+      const colors = typeof g.colors === "string" ? g.colors.trim() : "";
+      out.push(`Brand ${b.name}${b.slogan ? `, “${b.slogan}”` : ""}${voice ? `. Tone: ${voice.replace(/[.\s]+$/, "")}` : ""}${colors ? `. Brand colours: ${colors.replace(/[.\s]+$/, "")}` : ""}.`);
+    }
+  }
+  if (meta.productId) {
+    const p = await promptProduct(organizationId, meta.productId);
+    if (p) {
+      const details = Object.entries(p.attributes).slice(0, 6).map(([k, v]) => `${k} ${v}`).join(", ");
+      out.push(`Product ${p.name}${p.description ? `: ${p.description.replace(/[.\s]+$/, "").slice(0, 300)}` : ""}${details ? ` (${details})` : ""}.`);
+    }
+  }
+  return out;
+}
+
+/** The prompt that is sent to the model: template text, brand, product, each character, then what the user wrote. */
 export async function composePrompt(organizationId: string, meta: QuoteMeta): Promise<string> {
   const parts: string[] = [];
-  const template = meta.templateId ? await templateContext(meta.templateId) : null;
+  const template = meta.templateId ? await templateContext(meta.templateId, organizationId) : null;
   if (template) parts.push(template.text);
+  parts.push(...(await brandAndProductText(organizationId, meta)));
   const characters = meta.characterIds?.length ? await promptCharacters(organizationId, meta.characterIds) : [];
   for (const c of characters) parts.push(`Character ${c.name}${c.description ? `: ${c.description.replace(/[.\s]+$/, "")}` : ""}.`);
   const own = meta.prompt.trim();
@@ -70,7 +142,6 @@ export async function composePrompt(organizationId: string, meta: QuoteMeta): Pr
   const context = parts.join(" ").slice(0, room).trim();
   return context ? `${context} ${own}` : own;
 }
-
 const DEFAULT_SECONDS = DEFAULT_VIDEO_SECONDS;
 
 /** The model a quote runs on: its own when still offered, otherwise the mode's default (null if none is on). */
@@ -290,6 +361,7 @@ export async function postMessage(
       parentAssetId = parent.id;
     }
     const base: QuoteMeta = { ...meta, parentAssetId, ...(await resolveContext(organizationId, opts.context)) };
+    base.using = await describeContext(organizationId, base);
     const quote = onModel(base, await quoteModel(base));
     reply = {
       threadId,
@@ -392,7 +464,14 @@ export async function generateFromQuote(
       mode: meta.mode,
       prompt: await composePrompt(organizationId, meta),
       campaignId: meta.campaignId ?? null,
-      context: { templateId: meta.templateId ?? null, characterIds: meta.characterIds ?? [] },
+      brandId: meta.brandId ?? null,
+      context: {
+        templateId: meta.templateId ?? null,
+        characterIds: meta.characterIds ?? [],
+        brandId: meta.brandId ?? null,
+        productId: meta.productId ?? null,
+        startImage: meta.startImage ?? null,
+      },
       seconds: meta.seconds ?? undefined,
       aspectRatio: meta.aspectRatio,
       threadId: m.threadId,
@@ -464,6 +543,39 @@ export async function deriveQuote(
       kind: "QUOTE",
       body: await quoteSummary(await getPricing(), meta),
       meta: meta as unknown as Prisma.InputJsonValue,
+    },
+  });
+  await db.studioThread.update({ where: { id: asset.threadId }, data: { updatedAt: new Date() } });
+  return messageView(created, new Map());
+}
+
+/**
+ * "Improve this": a new quote made from the one that produced a finished result, with the
+ * person's suggestions added to the prompt. The context (brand, product, characters, template,
+ * starting picture) is carried over, so the result changes in the way asked and nothing else.
+ * Nothing is charged until the new quote is generated.
+ */
+export async function reviseQuote(organizationId: string, assetId: string, suggestions: string): Promise<MessageView> {
+  const text = suggestions.trim().replace(/\s+/g, " ");
+  if (text.length < 3) throw new ApiError(422, "VALIDATION_FAILED", "Say what to change, for example “warmer light, slower camera”.");
+  if (text.length > 500) throw new ApiError(422, "VALIDATION_FAILED", "Keep the suggestions under 500 characters.");
+  const asset = await db.generatedAsset.findFirst({ where: { id: assetId, organizationId, status: "READY", archivedAt: null } });
+  if (!asset || !asset.threadId) throw new ApiError(422, "VALIDATION_FAILED", "Pick a finished image or video to improve.");
+  const source = await db.studioMessage.findFirst({ where: { assetId: asset.id, organizationId, threadId: asset.threadId } });
+  const old = source?.meta as unknown as QuoteMeta | null;
+  if (!old) throw new ApiError(422, "VALIDATION_FAILED", "This one cannot be improved because its original request was not kept. Describe it again.");
+
+  const stem = old.prompt.replace(/\s*Changes requested:.*$/s, "").trim();
+  const meta: QuoteMeta = { ...old, prompt: `${stem}. Changes requested: ${text}.`.slice(0, 1800) };
+  const quote = onModel(meta, await quoteModel(meta));
+  const created = await db.studioMessage.create({
+    data: {
+      threadId: asset.threadId,
+      organizationId,
+      role: "ASSISTANT",
+      kind: "QUOTE",
+      body: await quoteSummary(await getPricing(), quote),
+      meta: quote as unknown as Prisma.InputJsonValue,
     },
   });
   await db.studioThread.update({ where: { id: asset.threadId }, data: { updatedAt: new Date() } });

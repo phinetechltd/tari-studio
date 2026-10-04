@@ -53,6 +53,11 @@ export interface GenerationProvider {
   status(requestId: string): Promise<RemoteState>;
   /** The cost of a request, from POST /estimate/{endpoint} (same body as the request). Null when unavailable. */
   estimate(endpoint: string, input: Record<string, unknown>, mode: GenerationMode): Promise<CostEstimate | null>;
+  /**
+   * Hands the provider a picture and returns the public URL to pass as `image_url`
+   * (docs.higgsfield.ai, "File uploads": generate-upload-url, then PUT to the presigned URL).
+   */
+  uploadImage(bytes: Uint8Array, mimeType: string): Promise<string>;
 }
 
 /** "1.500" credits, "0.094" dollars → integers. Null for anything unreadable. */
@@ -100,6 +105,37 @@ function higgsfield(credentials: string, billedTo: GenerationProvider["billedTo"
       } catch {
         return null; // an estimate is bookkeeping; never a reason to fail the render
       }
+    },
+
+    async uploadImage(bytes, mimeType) {
+      let res: Response;
+      try {
+        res = await fetch(`${BASE}/files/generate-upload-url`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ content_type: mimeType }),
+          signal: AbortSignal.timeout(20_000),
+        });
+      } catch (e) {
+        throw new GenerationProviderError(`Could not reach the generation service (${(e as Error).message}).`, true);
+      }
+      const body = (await res.json().catch(() => null)) as { upload_url?: string; public_url?: string; headers?: Record<string, string> } | null;
+      if (!res.ok) throw describeHttpError(res.status, body);
+      if (!body?.upload_url || !body.public_url) throw new GenerationProviderError("The generation service did not return an upload link.", true);
+      try {
+        // The presigned link is not ours to sign: never send the API key to it.
+        const put = await fetch(body.upload_url, {
+          method: "PUT",
+          headers: { "Content-Type": mimeType, ...(body.headers ?? {}) },
+          body: new Uint8Array(bytes),
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (!put.ok) throw new GenerationProviderError(`Sending the picture failed (HTTP ${put.status}).`, put.status >= 500);
+      } catch (e) {
+        if (e instanceof GenerationProviderError) throw e;
+        throw new GenerationProviderError(`Could not send the picture (${(e as Error).message}).`, true);
+      }
+      return body.public_url;
     },
 
     async submit(endpoint, input) {
@@ -153,6 +189,10 @@ function simulator(delayMs = Number(process.env.SIMULATOR_GEN_MS ?? 8000)): Gene
       if (mode === "image") return { milliCredits: 1500, usdMicros: 94_000 };
       const seconds = Number(input.duration) || 5;
       return { milliCredits: seconds * 1250, usdMicros: seconds * 78_000 };
+    },
+    async uploadImage(bytes) {
+      // A stand-in link: the simulator never reads it.
+      return `sim://upload/${crypto.createHash("sha256").update(bytes).digest("hex").slice(0, 16)}`;
     },
     async submit(_endpoint, input, mode) {
       const fails = typeof input.prompt === "string" && input.prompt.includes("[fail]");

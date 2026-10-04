@@ -16,6 +16,7 @@ import { requireTenant } from "@/lib/session";
 import { CLIENT_CASE } from "@/lib/showcase";
 import { wallet } from "@/server/credits";
 import { getPricing } from "@/server/pricing-store";
+import { countAwaiting } from "@/server/autopilot";
 import { setupProgress, shouldOpenWizard } from "@/server/setup";
 
 export const metadata: Metadata = { title: "Home" };
@@ -35,7 +36,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const canPosts = can(principal, "post:read");
   const weekAgo = new Date(Date.now() - 7 * 86_400_000);
 
-  const [tokens, clicks7d, leads7d, unreadConversations, scheduledPosts, recentAssets, attentionConversations, failedPosts, failedRuns] =
+  const canAutopilot = can(principal, "autopilot:read");
+  const [tokens, clicks7d, leads7d, unreadConversations, scheduledPosts, recentAssets, attentionConversations, failedPosts, failedRuns, awaitingPosts] =
     await Promise.all([
       canCreate ? wallet(organizationId) : null,
       canCampaigns ? db.clickEvent.count({ where: { clickedAt: { gte: weekAgo }, link: { organizationId } } }) : null,
@@ -74,6 +76,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             include: { automation: { select: { name: true } } },
           })
         : [],
+      canAutopilot ? countAwaiting(organizationId) : 0,
     ]);
 
   const pricing = await getPricing();
@@ -125,6 +128,17 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           </div>
           <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary">
             Continue <ArrowRight className="h-4 w-4" />
+          </span>
+        </Link>
+      ) : null}
+      {awaitingPosts > 0 && can(principal, "post:schedule") ? (
+        <Link href="/app/autopilot" className="card flex flex-wrap items-center gap-4 border-warning/40 p-5 hover:border-warning">
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">{awaitingPosts} Autopilot post{awaitingPosts === 1 ? "" : "s"} waiting for your approval</p>
+            <p className="mt-0.5 text-sm text-muted">Look them over, change the caption if you like, then approve to post.</p>
+          </div>
+          <span className="inline-flex items-center gap-1 text-sm font-semibold text-primary">
+            Review <ArrowRight className="h-4 w-4" />
           </span>
         </Link>
       ) : null}

@@ -8,11 +8,15 @@ import { db } from "@/lib/db";
 import type { Principal } from "@/lib/rbac";
 import { decryptFor, encryptFor } from "@/lib/secrets";
 import { orgIdOf, scope } from "@/lib/tenant";
+import { tikTokOptionsSchema, type TikTokOptions } from "@/lib/tiktok";
 
 import { fireAutomations } from "./automations";
 import { enqueue } from "./jobs";
 import { publicMediaUrl } from "./media-links";
 import { issuingAppId, meta, metaAppFor, metaAppForChannel, MetaApiError, type PageAccount } from "./meta";
+import { finishFailed } from "./post-outcomes";
+import { tiktok } from "./tiktok";
+import { startTikTokPublish, tiktokTokenFor } from "./tiktok-posting";
 
 /**
  * Social channels (Facebook Pages, Instagram accounts, WhatsApp numbers) and
@@ -22,7 +26,7 @@ import { issuingAppId, meta, metaAppFor, metaAppForChannel, MetaApiError, type P
  * and never leave the server: every read path here selects around them.
  */
 
-export const CHANNEL_PLATFORMS = ["FACEBOOK", "INSTAGRAM", "WHATSAPP"] as const;
+export const CHANNEL_PLATFORMS = ["FACEBOOK", "INSTAGRAM", "WHATSAPP", "TIKTOK"] as const;
 export type ChannelPlatform = (typeof CHANNEL_PLATFORMS)[number];
 
 /** Channel columns safe to send to a browser. */
@@ -214,6 +218,14 @@ export async function testChannel(principal: Principal, id: string) {
   if (!token) {
     status = "ERROR";
     detail = "The stored token cannot be read (the credentials key changed). Reconnect this channel.";
+  } else if (channel.platform === "TIKTOK") {
+    try {
+      const info = await tiktok().creatorInfo(await tiktokTokenFor(channel));
+      detail = `Connected as ${info.nickname}${info.username ? ` (@${info.username})` : ""}. Can post as: ${info.privacyOptions.join(", ")}.`;
+    } catch (error) {
+      status = "ERROR";
+      detail = error instanceof Error ? error.message : String(error);
+    }
   } else {
     try {
       const fields = channel.platform === "WHATSAPP" ? "display_phone_number,verified_name" : channel.platform === "INSTAGRAM" ? "username" : "name";
@@ -233,8 +245,10 @@ export async function disconnectChannel(principal: Principal, id: string) {
   await ownedChannel(principal, id);
   await db.socialChannel.update({
     where: { id },
-    data: { status: "DISCONNECTED", archivedAt: new Date(), tokenCipher: null, tokenIv: null, tokenTag: null },
+    data: { status: "DISCONNECTED", archivedAt: new Date(), tokenCipher: null, tokenIv: null, tokenTag: null, refreshCipher: null, refreshIv: null, refreshTag: null },
   });
+  // A TikTok channel's comment replies stop with it.
+  await db.externalAccount.updateMany({ where: { channelId: id, provider: "TIKTOK_BUSINESS" }, data: { status: "DISCONNECTED" } });
   // Posts still waiting for this channel can no longer go out.
   await db.socialPost.updateMany({
     where: { channelId: id, status: "SCHEDULED" },
@@ -249,11 +263,21 @@ export interface PostContent {
   text: string;
   assetId?: string | null;
   link?: string | null;
+  /** TikTok only: who can see it and what viewers may do (chosen per post, as TikTok requires) */
+  tiktok?: TikTokOptions;
 }
 
 export async function schedulePosts(
   principal: Principal,
-  input: { channelIds: string[]; text: string; assetId?: string | null; link?: string | null; campaignId?: string | null; scheduledAt?: Date | null },
+  input: {
+    channelIds: string[];
+    text: string;
+    assetId?: string | null;
+    link?: string | null;
+    campaignId?: string | null;
+    scheduledAt?: Date | null;
+    tiktok?: unknown;
+  },
   request?: Request,
 ) {
   const organizationId = orgIdOf(principal);
@@ -283,6 +307,15 @@ export async function schedulePosts(
     if (c.platform === "INSTAGRAM" && !asset) {
       throw new ApiError(422, "VALIDATION_FAILED", `${c.name} is on Instagram, which needs an image or a video.`);
     }
+    if (c.platform === "TIKTOK" && !asset) {
+      throw new ApiError(422, "VALIDATION_FAILED", `${c.name} is on TikTok, which needs a video or a picture.`);
+    }
+  }
+  let tiktokOptions: TikTokOptions | undefined;
+  if (channels.some((c) => c.platform === "TIKTOK")) {
+    const parsed = tikTokOptionsSchema.safeParse(input.tiktok);
+    if (!parsed.success) throw new ApiError(422, "VALIDATION_FAILED", parsed.error.issues[0]?.message ?? "Choose who can see the TikTok post.");
+    tiktokOptions = parsed.data;
   }
 
   if (input.campaignId) {
@@ -290,7 +323,7 @@ export async function schedulePosts(
     if (!campaign) throw notFound("Campaign not found.");
   }
 
-  const content: PostContent = { text, assetId: asset?.id ?? null, link: input.link?.trim() || null };
+  const content: PostContent = { text, assetId: asset?.id ?? null, link: input.link?.trim() || null, ...(tiktokOptions ? { tiktok: tiktokOptions } : {}) };
   const created = [];
   for (const c of channels) {
     const post = await db.socialPost.create({
@@ -377,6 +410,9 @@ export async function publishPost(postId: string): Promise<void> {
     return;
   }
 
+  // A TikTok post that TikTok is still processing is followed by its status checks, not re-sent.
+  if (post.channel.platform === "TIKTOK" && (post.content as { tiktokPublishId?: string } | null)?.tiktokPublishId) return;
+
   if (post.status === "PUBLISHING") {
     // A worker died between claiming this and recording the answer. The post may
     // be live; posting again could duplicate it, so a person decides.
@@ -386,6 +422,15 @@ export async function publishPost(postId: string): Promise<void> {
 
   const claimed = await db.socialPost.updateMany({ where: { id: postId, status: "SCHEDULED" }, data: { status: "PUBLISHING" } });
   if (claimed.count === 0) return;
+
+  if (post.channel.platform === "TIKTOK") {
+    if (post.channel.status !== "ACTIVE") {
+      await finishFailed(post.id, post.organizationId, post.brandId, "The TikTok account is disconnected. Reconnect it and retry.");
+      return;
+    }
+    await startTikTokPublish(post, post.channel);
+    return;
+  }
 
   const channel = post.channel;
   const token = channelToken(channel);
@@ -443,15 +488,4 @@ export async function publishPost(postId: string): Promise<void> {
         : `Meta rejected the post: ${error instanceof Error ? error.message : String(error)}`;
     await finishFailed(post.id, post.organizationId, post.brandId, message);
   }
-}
-
-async function finishFailed(postId: string, organizationId: string, brandId: string, message: string) {
-  await db.socialPost.update({ where: { id: postId }, data: { status: "FAILED", error: message.slice(0, 1000) } });
-  await fireAutomations({
-    organizationId,
-    brandId,
-    trigger: "POST_FAILED",
-    eventKey: `post:${postId}:failed:${Date.now()}`,
-    context: { postId, error: message },
-  });
 }

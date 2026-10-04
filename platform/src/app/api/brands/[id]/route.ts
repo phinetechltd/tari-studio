@@ -6,6 +6,7 @@ import { deleteBrand, getBrandById, updateBrand } from "@/server/brands";
 const UpdateBody = z.object({
   name: z.string().trim().min(2).max(200).optional(),
   avatarUrl: z.string().url().max(500).nullable().optional(),
+  slogan: z.string().trim().max(160).nullable().optional(),
   guidelines: z.record(z.unknown()).optional(),
   contactName: z.string().max(200).nullable().optional(),
   contactEmail: z.string().email().max(254).nullable().optional(),

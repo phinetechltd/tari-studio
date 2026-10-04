@@ -23,6 +23,7 @@ export type NavIcon =
   | "inbox"
   | "leads"
   | "automations"
+  | "autopilot"
   | "brands"
   | "catalogue"
   | "templates"
@@ -61,8 +62,9 @@ export const NAV: NavItem[] = [
   { href: "/app/inbox", label: "Inbox", icon: "inbox", group: "Grow", permission: "inbox:read", scope: "tenant", tag: "NEW" },
   { href: "/app/leads", label: "Leads", icon: "leads", group: "Grow", permission: "lead:read", scope: "tenant" },
   { href: "/app/automations", label: "Automations", icon: "automations", group: "Grow", permission: "inbox:read", scope: "tenant", tag: "NEW" },
+  { href: "/app/autopilot", label: "Autopilot", icon: "autopilot", group: "Grow", permission: "autopilot:read", scope: "tenant", tag: "NEW" },
   { href: "/app/brands", label: "Brands", icon: "brands", group: "Business", permission: "brand:read", scope: "tenant" },
-  { href: "/app/catalogue", label: "Catalogue", icon: "catalogue", group: "Business", permission: "catalogue:read", scope: "tenant" },
+  { href: "/app/products", label: "Products", icon: "catalogue", group: "Business", permission: "product:read", scope: "tenant" },
   { href: "/app/orders", label: "Orders", icon: "orders", group: "Business", permission: "order:read", scope: "tenant" },
   { href: "/app/content", label: "Tasks", icon: "tasks", group: "Business", permission: "content:read", scope: "tenant" },
   { href: "/platform", label: "Organisations", icon: "organisations", group: "Account", scope: "platform" },

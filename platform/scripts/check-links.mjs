@@ -47,16 +47,34 @@ for (const file of walk(appDir)) {
       return "/" + s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     })
     .join("");
-  routes.push({ kind, path: "/" + segments.join("/"), re: new RegExp(`^${pattern || ""}/?$`) });
+  const segs = segments.map((s) => (/^\[\[\.\.\..+\]\]$/.test(s) ? "**?" : /^\[\.\.\..+\]$/.test(s) ? "**" : /^\[.+\]$/.test(s) ? "*" : s));
+  routes.push({ kind, path: "/" + segments.join("/"), re: new RegExp(`^${pattern || ""}/?$`), segs });
 }
 // Files Next serves itself.
 const special = new Set(["/icon.png", "/apple-icon.png", "/favicon.ico", "/robots.txt", "/sitemap.xml", "/manifest.webmanifest", "/opengraph-image.png"]);
 
 const publicFiles = new Set(walk(publicDir).map((f) => "/" + path.relative(publicDir, f).split(path.sep).join("/")));
 
+/** A link segment from a template placeholder (${id}, ${kind}) can be any single segment, static or dynamic. */
+const ANY = "__any__";
+
+function unify(routeSegs, linkSegs) {
+  for (let i = 0; i < routeSegs.length; i++) {
+    const r = routeSegs[i];
+    if (r === "**") return linkSegs.length > i;
+    if (r === "**?") return true;
+    const l = linkSegs[i];
+    if (l === undefined) return false;
+    if (r !== "*" && l !== ANY && r !== l) return false;
+  }
+  return routeSegs.length === linkSegs.length;
+}
+
 function resolves(url) {
   if (special.has(url) || publicFiles.has(url)) return true;
-  return routes.some((r) => r.re.test(url));
+  if (!url.includes(ANY)) return routes.some((r) => r.re.test(url));
+  const linkSegs = url.split("/").filter(Boolean);
+  return routes.some((r) => unify(r.segs, linkSegs));
 }
 
 // ── the links ────────────────────────────────────────────────────────────
@@ -94,7 +112,7 @@ for (const file of SOURCES) {
       }
       url = url.split("#")[0].split("?")[0];
       // "/orgs/${id}" or "/orgs/${id}/x": one segment. "/orders${qs}": a query string. "/a/v-${n}": part of a segment.
-      url = url.replace(/\u0001$/, (m, at) => (url[at - 1] === "/" ? "x" : "")).replace(/\u0001/g, "x");
+      url = url.replace(/\u0001$/, (m, at) => (url[at - 1] === "/" ? ANY : "")).replace(/(^|\/)\u0001(?=\/|$)/g, `$1${ANY}`).replace(/\u0001/g, "x");
       if (url.length > 1 && url.endsWith("/")) url = url.slice(0, -1);
       if (!url) url = "/";
       checked += 1;

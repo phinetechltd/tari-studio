@@ -28,6 +28,14 @@ export interface QuoteMeta {
   parentAssetId: string | null;
   /** The catalogue model it runs on (src/server/ai-models.ts) */
   modelKey?: string | null;
+  brandId?: string | null;
+  productId?: string | null;
+  templateId?: string | null;
+  characterIds?: string[];
+  /** The picture a video starts from (null = words only) */
+  startImage?: { source: string; id: string } | null;
+  /** Names and the starting picture, written when the quote was made */
+  using?: { labels: string[]; start: { thumb: string; label: string } | null };
 }
 
 export interface MessageView {

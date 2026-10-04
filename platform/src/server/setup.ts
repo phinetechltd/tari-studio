@@ -16,7 +16,7 @@ import { denialReason, type Permission, type Principal } from "@/lib/rbac";
  * (Organization.setupState).
  */
 
-export type StepKey = "profile" | "brand" | "catalogue" | "plan" | "channels" | "team" | "generate";
+export type StepKey = "profile" | "brand" | "brandProfile" | "catalogue" | "plan" | "channels" | "team" | "generate";
 
 export interface SetupStep {
   key: StepKey;
@@ -34,7 +34,7 @@ export interface SetupState {
   skipped?: StepKey[];
 }
 
-const STEP_KEYS: StepKey[] = ["profile", "brand", "catalogue", "plan", "channels", "team", "generate"];
+const STEP_KEYS: StepKey[] = ["profile", "brand", "brandProfile", "catalogue", "plan", "channels", "team", "generate"];
 
 const STEPS: Array<Omit<SetupStep, "done" | "skipped"> & { permission?: Permission }> = [
   {
@@ -53,12 +53,20 @@ const STEPS: Array<Omit<SetupStep, "done" | "skipped"> & { permission?: Permissi
     permission: "brand:write",
   },
   {
+    key: "brandProfile",
+    title: "Finish your brand profile",
+    description: "A slogan and a cover picture. Captions, videos and Autopilot use them to look like your brand.",
+    href: "/app/brands",
+    action: "Open your brands",
+    permission: "brand:write",
+  },
+  {
     key: "catalogue",
-    title: "Add a product or service",
-    description: "What you sell, with a price. The Studio and WhatsApp replies draw on it.",
-    href: "/app/catalogue/new",
-    action: "Add an item",
-    permission: "catalogue:write",
+    title: "Add a product",
+    description: "What you sell, with pictures and a price. The Studio, Autopilot and WhatsApp replies draw on it.",
+    href: "/app/products/new",
+    action: "Add a product",
+    permission: "product:write",
   },
   {
     key: "plan",
@@ -113,10 +121,11 @@ export interface SetupProgress {
 /** Where an organisation is with getting started, from what actually exists. */
 export async function setupProgress(principal: Principal & { organizationId: string }): Promise<SetupProgress> {
   const orgId = principal.organizationId;
-  const [org, me, brands, items, sub, purchases, channels, members, invites, assets] = await Promise.all([
+  const [org, me, brands, profiled, items, sub, purchases, channels, members, invites, assets] = await Promise.all([
     db.organization.findUniqueOrThrow({ where: { id: orgId }, select: { setupState: true, plan: true } }),
     db.user.findUnique({ where: { id: principal.userId }, select: { phone: true, setupGuideOff: true } }),
     db.brand.count({ where: { organizationId: orgId } }),
+    db.brand.count({ where: { organizationId: orgId, status: "ACTIVE", slogan: { not: null }, coverImageKey: { not: null } } }),
     db.catalogueItem.count({ where: { organizationId: orgId } }),
     db.subscription.findUnique({ where: { organizationId: orgId }, select: { status: true } }),
     db.tokenLedger.count({ where: { organizationId: orgId, reason: { in: ["PURCHASE", "GRANT"] } } }),
@@ -129,6 +138,7 @@ export async function setupProgress(principal: Principal & { organizationId: str
   const done: Record<StepKey, boolean> = {
     profile: Boolean(me?.phone),
     brand: brands > 0,
+    brandProfile: profiled > 0,
     catalogue: items > 0,
     plan: org.plan === "INTERNAL" || (sub !== null && sub.status !== "EXPIRED") || purchases > 0,
     channels: channels > 0,

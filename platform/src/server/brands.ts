@@ -33,6 +33,7 @@ export async function createBrand(input: {
   name: string;
   guidelines?: Record<string, unknown>;
   avatarUrl?: string;
+  slogan?: string;
   contactName?: string;
   contactEmail?: string;
   contactPhone?: string;
@@ -63,6 +64,7 @@ export async function createBrand(input: {
       brandNumber,
       guidelines: input.guidelines !== undefined ? (input.guidelines as Prisma.InputJsonValue) : undefined,
       avatarUrl: input.avatarUrl ?? null,
+      slogan: input.slogan?.trim() || null,
       contactName: input.contactName ?? null,
       contactEmail: input.contactEmail ?? null,
       contactPhone: input.contactPhone ?? null,
@@ -99,6 +101,9 @@ export async function listBrands(principal: Principal, includeArchived = false) 
       slug: true,
       brandNumber: true,
       avatarUrl: true,
+      slogan: true,
+      coverImageKey: true,
+      logoKey: true,
       status: true,
       _count: { select: { catalogueItems: true, tasks: true, posts: true, channels: true } },
       creator: { select: { name: true } },
@@ -128,6 +133,7 @@ export async function updateBrand(
   updates: Partial<{
     name: string;
     avatarUrl: string | null;
+    slogan: string | null;
     guidelines: Record<string, unknown>;
     contactName: string | null;
     contactEmail: string | null;
@@ -147,6 +153,7 @@ export async function updateBrand(
     data: {
       ...(updates.name !== undefined ? { name: updates.name.trim() } : {}),
       ...(updates.avatarUrl !== undefined ? { avatarUrl: updates.avatarUrl } : {}),
+      ...(updates.slogan !== undefined ? { slogan: updates.slogan?.trim() || null } : {}),
       ...(updates.guidelines !== undefined ? { guidelines: updates.guidelines as Prisma.InputJsonValue } : {}),
       ...(updates.contactName !== undefined ? { contactName: updates.contactName } : {}),
       ...(updates.contactEmail !== undefined ? { contactEmail: updates.contactEmail } : {}),

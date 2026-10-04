@@ -1,6 +1,6 @@
 "use client";
 
-import { MessageCircle, Share2 } from "lucide-react";
+import { MessageCircle, Music2, Share2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -13,6 +13,8 @@ export function ConnectForms(props: {
   simulated: boolean;
   webhookUrl: string;
   webhookReady: boolean;
+  /** "live" | "simulator" | "off" (Settings → TikTok) */
+  tiktokMode?: string;
 }) {
   const router = useRouter();
   const [brandId, setBrandId] = useState(props.defaultBrandId ?? (props.brands.length === 1 ? props.brands[0]!.id : ""));
@@ -133,6 +135,33 @@ export function ConnectForms(props: {
             </p>
           </div>
         </section>
+
+        {props.tiktokMode && props.tiktokMode !== "off" ? (
+          <section className="panel p-6 lg:col-span-2" aria-labelledby="tt">
+            <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-ink">
+              <Music2 className="h-5 w-5" />
+            </span>
+            <h2 id="tt" className="mt-4 text-lg font-semibold">
+              TikTok
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted">
+              Sign in with TikTok to post videos and pictures from your Library. After connecting, you can also switch on automatic comment replies for a TikTok Business account.
+              Tokens are encrypted and never shown again.
+            </p>
+            <a
+              href={brandId ? `/api/channels/tiktok/start?brandId=${encodeURIComponent(brandId)}` : undefined}
+              aria-disabled={!brandId}
+              className={`btn-primary mt-5 ${brandId ? "" : "pointer-events-none opacity-50"}`}
+            >
+              {props.tiktokMode === "simulator" ? "Connect a simulated TikTok account" : "Continue with TikTok"}
+            </a>
+            {props.tiktokMode === "simulator" ? (
+              <p className="mt-2 text-xs text-muted">Simulator: connects a test account and pretends to post, without leaving the app.</p>
+            ) : (
+              <p className="mt-2 text-xs text-muted">Until TikTok audits this app, posts can only be seen by the account owner (&quot;Only me&quot;).</p>
+            )}
+          </section>
+        ) : null}
       </div>
     </div>
   );

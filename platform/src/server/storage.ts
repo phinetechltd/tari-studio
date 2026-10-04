@@ -1,7 +1,7 @@
 import "server-only";
 
 import { createReadStream, createWriteStream } from "node:fs";
-import { copyFile, mkdir, rename, rm, stat, writeFile } from "node:fs/promises";
+import { copyFile, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -9,6 +9,7 @@ import { pipeline } from "node:stream/promises";
 import { NextResponse } from "next/server";
 
 import { env } from "@/lib/env";
+import { imageSizeProblem, INPUT_IMAGE_LIMITS, sendSize } from "@/lib/generation-models";
 
 /**
  * Local file storage for generated media.
@@ -29,6 +30,10 @@ const MIME_BY_EXT: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
   ".webp": "image/webp",
+  ".pdf": "application/pdf",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
 };
 
 const EXT_BY_MIME: Record<string, string> = {
@@ -174,7 +179,35 @@ export async function serveFile(
 
 /* ── Uploads from people (template packs, character images) ────────────── */
 
-export const MAX_IMAGE_UPLOAD_BYTES = 10 * 1024 * 1024;
+export const MAX_IMAGE_UPLOAD_BYTES = INPUT_IMAGE_LIMITS.maxBytes;
+
+/** Width and height of image bytes, or null when they cannot be read as an image. */
+export async function imageDimensions(bytes: Uint8Array): Promise<{ width: number; height: number } | null> {
+  try {
+    const { default: sharp } = await import("sharp");
+    const m = await sharp(bytes).metadata();
+    return m.width && m.height ? { width: m.width, height: m.height } : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The bytes to send to the provider: the stored picture, scaled down when its long side is over
+ * `sendMaxSide`. Returns the original untouched when it is already small enough.
+ */
+export async function bytesForProvider(key: string): Promise<{ bytes: Buffer; mimeType: string }> {
+  const raw = await readFile(resolveKey(key));
+  const kind = sniffImage(raw);
+  if (!kind) throw new UploadError("That stored file is not an image.");
+  const dims = await imageDimensions(raw);
+  if (!dims) return { bytes: raw, mimeType: kind.mimeType };
+  const target = sendSize(dims.width, dims.height);
+  if (target.width === dims.width && target.height === dims.height) return { bytes: raw, mimeType: kind.mimeType };
+  const { default: sharp } = await import("sharp");
+  const resized = await sharp(raw).resize(target.width, target.height, { fit: "inside" }).toBuffer();
+  return { bytes: resized, mimeType: kind.mimeType };
+}
 
 /** What an uploaded image really is, from its first bytes, never from its name or content-type. */
 export function sniffImage(bytes: Uint8Array): { mimeType: string; ext: string } | null {
@@ -192,6 +225,31 @@ export function sniffImage(bytes: Uint8Array): { mimeType: string; ext: string }
 
 export class UploadError extends Error {}
 
+/** Documents a brand may keep alongside its pictures (style guides, price lists). */
+export const DOCUMENT_EXTENSIONS = [".pdf", ".docx", ".xlsx", ".pptx"] as const;
+
+/**
+ * Stores a document upload. Only PDF and Office files, up to 10 MB, and the first bytes must
+ * match the extension (a PDF starts "%PDF-", an Office file is a ZIP). Always served back as a download.
+ */
+export async function saveDocument(file: Blob & { name?: string }, keyWithoutExt: string): Promise<{ key: string; bytes: number; mimeType: string; ext: string }> {
+  if (file.size === 0) throw new UploadError("That file is empty.");
+  if (file.size > MAX_IMAGE_UPLOAD_BYTES) throw new UploadError(`Files can be at most ${MAX_IMAGE_UPLOAD_BYTES / 1024 / 1024} MB.`);
+  const ext = path.extname(file.name ?? "").toLowerCase();
+  if (!(DOCUMENT_EXTENSIONS as readonly string[]).includes(ext)) throw new UploadError("Upload a PDF, Word, Excel or PowerPoint file, or a picture.");
+  const buf = new Uint8Array(await file.arrayBuffer());
+  const isPdf = buf.length > 5 && String.fromCharCode(buf[0]!, buf[1]!, buf[2]!, buf[3]!, buf[4]!) === "%PDF-";
+  const isZip = buf.length > 4 && buf[0] === 0x50 && buf[1] === 0x4b && buf[2] === 0x03 && buf[3] === 0x04;
+  if (ext === ".pdf" ? !isPdf : !isZip) throw new UploadError("That file does not look like the type its name says.");
+  const key = `${keyWithoutExt}${ext}`;
+  const full = resolveKey(key);
+  await mkdir(path.dirname(full), { recursive: true });
+  const tmp = `${full}.part`;
+  await writeFile(tmp, buf);
+  await rename(tmp, full);
+  return { key, bytes: buf.length, mimeType: MIME_BY_EXT[ext]!, ext };
+}
+
 /**
  * Stores an uploaded image under `keyWithoutExt` plus the extension its bytes
  * call for. Only PNG, JPEG and WebP up to 10 MB are accepted; anything else
@@ -199,10 +257,14 @@ export class UploadError extends Error {}
  */
 export async function saveUpload(file: Blob, keyWithoutExt: string): Promise<{ key: string; bytes: number; mimeType: string }> {
   if (file.size === 0) throw new UploadError("That file is empty.");
-  if (file.size > MAX_IMAGE_UPLOAD_BYTES) throw new UploadError("Images can be at most 10 MB.");
+  if (file.size > MAX_IMAGE_UPLOAD_BYTES) throw new UploadError(`Images can be at most ${MAX_IMAGE_UPLOAD_BYTES / 1024 / 1024} MB.`);
   const buf = new Uint8Array(await file.arrayBuffer());
   const kind = sniffImage(buf);
   if (!kind) throw new UploadError("Upload a PNG, JPEG or WebP image.");
+  const dims = await imageDimensions(buf);
+  if (!dims) throw new UploadError("That image could not be read. Try saving it again as a PNG or JPEG.");
+  const problem = imageSizeProblem(dims.width, dims.height);
+  if (problem) throw new UploadError(problem);
   const key = `${keyWithoutExt}${kind.ext}`;
   const full = resolveKey(key);
   await mkdir(path.dirname(full), { recursive: true });

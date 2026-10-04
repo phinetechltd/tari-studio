@@ -9,7 +9,7 @@
  * two-factor authentication).
  */
 
-export type PlatformGroup = "ai" | "video" | "social" | "mpesa" | "paystack" | "email" | "sms" | "google";
+export type PlatformGroup = "ai" | "video" | "social" | "tiktok" | "pinterest" | "mpesa" | "paystack" | "email" | "sms" | "google";
 
 export interface PlatformSettingSpec {
   key: string;
@@ -31,6 +31,8 @@ export const PLATFORM_GROUPS: Array<{ id: PlatformGroup; name: string; summary: 
   { id: "email", name: "Email (SMTP)", summary: "Invitations, receipts and notification emails, sent through your SMTP account." },
   { id: "google", name: "Google sign-in", summary: "Lets people sign in or sign up with their Google account. Create an OAuth client in Google Cloud and paste its id and secret here." },
   { id: "sms", name: "SMS (Bonga)", summary: "Urgent notifications by text: failed renewals, plans ending, empty wallets, AI credits." },
+  { id: "tiktok", name: "TikTok", summary: "Post videos and photos to TikTok, and (with TikTok's Business API) answer comments automatically." },
+  { id: "pinterest", name: "Pinterest", summary: "Let organisations search their own Pinterest pins and boards for template ideas." },
 ];
 
 export const PLATFORM_SETTINGS: PlatformSettingSpec[] = [
@@ -197,6 +199,60 @@ export const PLATFORM_SETTINGS: PlatformSettingSpec[] = [
   },
   { key: "SMS_DAILY_CAP", label: "Daily SMS limit", group: "sms", secret: false, placeholder: "300", help: "Across the platform; texts beyond it are logged, not sent." },
 ];
+
+PLATFORM_SETTINGS.push(
+  {
+    key: "TIKTOK_PROVIDER",
+    label: "Mode",
+    group: "tiktok",
+    secret: false,
+    options: [
+      { value: "live", label: "Live (TikTok API)" },
+      { value: "simulator", label: "Simulator (development only)" },
+      { value: "off", label: "Off (no TikTok)" },
+    ],
+  },
+  {
+    key: "TIKTOK_CLIENT_KEY",
+    label: "Client key",
+    group: "tiktok",
+    secret: false,
+    help: "developers.tiktok.com → your app → Login Kit and Content Posting API. Redirect URI: /api/channels/tiktok/callback. Until TikTok audits the app, everything it posts is private (Only me).",
+  },
+  { key: "TIKTOK_CLIENT_SECRET", label: "Client secret", group: "tiktok", secret: true, help: "Also signs TikTok's webhooks: set the webhook URL to /api/webhooks/tiktok." },
+  {
+    key: "TIKTOK_BUSINESS_APP_ID",
+    label: "Business API app ID (comments)",
+    group: "tiktok",
+    secret: false,
+    help: "Optional. business-api.tiktok.com app with comment scopes, for comment auto-replies on TikTok Business accounts. Redirect URI: /api/channels/tiktok/business/callback.",
+  },
+  { key: "TIKTOK_BUSINESS_SECRET", label: "Business API secret", group: "tiktok", secret: true },
+  {
+    key: "PINTEREST_PROVIDER",
+    label: "Mode",
+    group: "pinterest",
+    secret: false,
+    options: [
+      { value: "live", label: "Live (Pinterest API)" },
+      { value: "simulator", label: "Simulator (development only)" },
+      { value: "off", label: "Off (pasted links only)" },
+    ],
+  },
+  { key: "PINTEREST_APP_ID", label: "App ID", group: "pinterest", secret: false, help: "developers.pinterest.com → My apps. Redirect URI: /api/pinterest/callback." },
+  { key: "PINTEREST_APP_SECRET", label: "App secret key", group: "pinterest", secret: true },
+  {
+    key: "PINTEREST_PARTNER_SEARCH",
+    label: "Search all of Pinterest",
+    group: "pinterest",
+    secret: false,
+    options: [
+      { value: "off", label: "Off (own pins and pasted links)" },
+      { value: "on", label: "On (Pinterest granted partner search)" },
+    ],
+    help: "Only switch on once Pinterest has given your app access to partner pin search.",
+  },
+);
 
 export const PLATFORM_SETTING_KEYS: ReadonlySet<string> = new Set(PLATFORM_SETTINGS.map((s) => s.key));
 

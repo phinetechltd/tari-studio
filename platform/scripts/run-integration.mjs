@@ -74,6 +74,16 @@ const env = {
   META_APP_SECRET: "integration-meta-app-secret",
   META_WEBHOOK_VERIFY_TOKEN: "integration-verify-token",
   APP_BASE_URL: "http://localhost:3400",
+  // Never the real TikTok or Pinterest either.
+  TIKTOK_PROVIDER: "simulator",
+  TIKTOK_CLIENT_KEY: "",
+  TIKTOK_CLIENT_SECRET: "",
+  TIKTOK_BUSINESS_APP_ID: "",
+  TIKTOK_BUSINESS_SECRET: "",
+  PINTEREST_PROVIDER: "simulator",
+  PINTEREST_APP_ID: "",
+  PINTEREST_APP_SECRET: "",
+  PINTEREST_PARTNER_SEARCH: "off",
 };
 
 function run(cmd, args, label) {
@@ -110,7 +120,8 @@ run(
     "scripts/tsconfig.json",
     "--test",
     "--test-concurrency=1",
-    "scripts/integration/*.test.ts",
+    // INTEGRATION_FILES="scripts/integration/orders.test.ts" runs just those files.
+    ...(process.env.INTEGRATION_FILES ? process.env.INTEGRATION_FILES.split(",") : ["scripts/integration/*.test.ts"]),
   ],
   "integration tests",
 );

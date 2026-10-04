@@ -35,6 +35,7 @@ export function StudioApp({
   initialDraft,
   contextOptions,
   initialContext,
+  canAutomate,
 }: {
   initialThreads: ThreadSummary[];
   initialDetail: ThreadDetail | null;
@@ -49,6 +50,8 @@ export function StudioApp({
   /** Templates, characters and campaigns the prompt can draw on */
   contextOptions?: ContextOptions;
   initialContext?: Partial<StudioContext>;
+  /** The person may set up Autopilot (permission and module) */
+  canAutomate?: boolean;
 }) {
   const router = useRouter();
   const [threads, setThreads] = useState(initialThreads);
@@ -64,6 +67,8 @@ export function StudioApp({
     templateId: initialContext?.templateId ?? null,
     characterIds: initialContext?.characterIds ?? [],
     campaignId: initialContext?.campaignId ?? null,
+    brandId: initialContext?.brandId ?? null,
+    productId: initialContext?.productId ?? null,
   });
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
@@ -161,7 +166,16 @@ export function StudioApp({
     if (!threadId) throw new Error("no project");
     const r = await callApi<MessageView[]>(`/api/studio/threads/${threadId}/messages`, {
       method: "POST",
-      body: JSON.stringify({ text, templateId: ctx.templateId, characterIds: ctx.characterIds, campaignId: ctx.campaignId }),
+      body: JSON.stringify({
+        text,
+        templateId: ctx.templateId,
+        characterIds: ctx.characterIds,
+        campaignId: ctx.campaignId,
+        brandId: ctx.brandId,
+        productId: ctx.productId,
+        // undefined (never chosen) is left out so the server picks the product's or a character's picture
+        ...(ctx.startImage !== undefined ? { startImage: ctx.startImage } : {}),
+      }),
     });
     if (r.error) {
       setError(r.error);
@@ -191,6 +205,13 @@ export function StudioApp({
 
   const derive = async (assetId: string, mode: "animate" | "extend") => {
     const r = await callApi<MessageView>("/api/studio/derive", { method: "POST", body: JSON.stringify({ assetId, mode }) });
+    if (r.error) setError(r.error);
+    else appendMessages([r.data!]);
+  };
+
+  const improve = async (assetId: string, suggestions: string) => {
+    setError(null);
+    const r = await callApi<MessageView>("/api/studio/improve", { method: "POST", body: JSON.stringify({ assetId, suggestions }) });
     if (r.error) setError(r.error);
     else appendMessages([r.data!]);
   };
@@ -427,6 +448,18 @@ export function StudioApp({
                   Describe a scene. Say how long (&ldquo;15 seconds&rdquo;) and which shape (&ldquo;vertical&rdquo;). You will see the
                   credit cost before anything is generated.
                 </p>
+                {canAutomate && (
+                  <div className="mx-auto mt-6 grid max-w-xl gap-2 text-left sm:grid-cols-2">
+                    <a href="/app/autopilot/new" className="rounded-xl border border-line p-3 transition-colors hover:border-primary/50">
+                      <span className="block text-sm font-medium text-ink">Show off a product every week</span>
+                      <span className="block text-xs text-ink/50">Autopilot makes the post and asks you before it goes out.</span>
+                    </a>
+                    <a href="/app/autopilot" className="rounded-xl border border-line p-3 transition-colors hover:border-primary/50">
+                      <span className="block text-sm font-medium text-ink">See what Autopilot has made</span>
+                      <span className="block text-xs text-ink/50">Approve waiting posts and check what went out.</span>
+                    </a>
+                  </div>
+                )}
               </div>
             )}
             {messages.map((m) => (
@@ -438,6 +471,8 @@ export function StudioApp({
                     asset={m.asset}
                     onDerive={(mode) => derive(m.asset!.id, mode)}
                     onAgain={() => again(m.id)}
+                    onImprove={(text) => improve(m.asset!.id, text)}
+                    onAutomate={canAutomate ? () => router.push(`/app/autopilot/new?asset=${m.asset!.id}`) : undefined}
                     onMediaLoaded={onMediaLoaded}
                   />
                 ) : m.kind === "QUOTE" && m.meta ? (

@@ -87,6 +87,22 @@ const schema = z.object({
   /** sk_live_… or sk_test_…; also the key that signs Paystack's webhooks */
   PAYSTACK_SECRET_KEY: z.string().optional(),
   /** Image and video generation. "simulator" returns sample media; production refuses it. */
+  /**
+   * TikTok: Login Kit + Content Posting API (developers.tiktok.com) for posting,
+   * and optionally the TikTok API for Business (business-api.tiktok.com) for
+   * reading and answering comments. "simulator" pretends (production refuses it).
+   */
+  TIKTOK_PROVIDER: z.enum(["simulator", "live", "off"]).default("simulator"),
+  TIKTOK_CLIENT_KEY: z.string().optional(),
+  TIKTOK_CLIENT_SECRET: z.string().optional(),
+  TIKTOK_BUSINESS_APP_ID: z.string().optional(),
+  TIKTOK_BUSINESS_SECRET: z.string().optional(),
+  /** Pinterest API v5: an organisation's own pins and boards as template sources. */
+  PINTEREST_PROVIDER: z.enum(["simulator", "live", "off"]).default("simulator"),
+  PINTEREST_APP_ID: z.string().optional(),
+  PINTEREST_APP_SECRET: z.string().optional(),
+  /** "on" once Pinterest grants the app partner search (searching all of Pinterest, not just your own pins) */
+  PINTEREST_PARTNER_SEARCH: z.enum(["on", "off"]).default("off"),
   GENERATION_PROVIDER: z.enum(["simulator", "higgsfield"]).default("simulator"),
   /** Higgsfield API credentials, "KEY_ID:KEY_SECRET" */
   HF_CREDENTIALS: z.string().optional(),

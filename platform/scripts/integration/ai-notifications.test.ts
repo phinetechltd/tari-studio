@@ -38,7 +38,7 @@ async function tenant(plan = "TRIAL") {
   const org = await makeOrg({ plan });
   const { user } = await makeUser();
   await addMember(user.id, org.id, "OWNER");
-  const owner: Principal & { organizationId: string } = { userId: user.id, organizationId: org.id, role: "OWNER", extraPermissions: [], enabledModules: new Set(["AI_CONTENT", "SOCIAL_PUBLISHING"]), mfa: true };
+  const owner: Principal & { organizationId: string } = { userId: user.id, organizationId: org.id, role: "OWNER", extraPermissions: [], enabledModules: new Set(["AI_CONTENT", "SOCIAL_PUBLISHING", "PRODUCTS"]), mfa: true };
   return { orgId: org.id, userId: user.id, owner };
 }
 
