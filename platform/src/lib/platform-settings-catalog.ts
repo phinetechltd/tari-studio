@@ -9,7 +9,7 @@
  * two-factor authentication).
  */
 
-export type PlatformGroup = "ai" | "video" | "social" | "tiktok" | "pinterest" | "mpesa" | "paystack" | "email" | "sms" | "google";
+export type PlatformGroup = "ai" | "video" | "social" | "tiktok" | "pinterest" | "mpesa" | "paystack" | "email" | "sms" | "google" | "seo";
 
 export interface PlatformSettingSpec {
   key: string;
@@ -33,6 +33,7 @@ export const PLATFORM_GROUPS: Array<{ id: PlatformGroup; name: string; summary: 
   { id: "sms", name: "SMS (Bonga)", summary: "Urgent notifications by text: failed renewals, plans ending, empty wallets, AI credits." },
   { id: "tiktok", name: "TikTok", summary: "Post videos and photos to TikTok, and (with TikTok's Business API) answer comments automatically." },
   { id: "pinterest", name: "Pinterest", summary: "Let organisations search their own Pinterest pins and boards for template ideas." },
+  { id: "seo", name: "Search engines", summary: "Google Search Console and Bing verification, and the official profiles search engines link to the site." },
 ];
 
 export const PLATFORM_SETTINGS: PlatformSettingSpec[] = [
@@ -251,6 +252,26 @@ PLATFORM_SETTINGS.push(
       { value: "on", label: "On (Pinterest granted partner search)" },
     ],
     help: "Only switch on once Pinterest has given your app access to partner pin search.",
+  },
+);
+
+PLATFORM_SETTINGS.push(
+  {
+    key: "GOOGLE_SITE_VERIFICATION",
+    label: "Google Search Console code",
+    group: "seo",
+    secret: false,
+    placeholder: "e.g. 3yTzQ…",
+    help: "Search Console → Add property → URL prefix → HTML tag: paste only the content=\"…\" value. A DNS TXT record (Domain property) works too and needs nothing here.",
+  },
+  { key: "BING_SITE_VERIFICATION", label: "Bing Webmaster code", group: "seo", secret: false, help: "Optional. Bing Webmaster Tools → meta tag (msvalidate.01). Bing can also import the site straight from Search Console." },
+  {
+    key: "SEO_SOCIAL_PROFILES",
+    label: "Official social profiles",
+    group: "seo",
+    secret: false,
+    placeholder: "https://www.instagram.com/yourbrand, https://www.tiktok.com/@yourbrand",
+    help: "Comma-separated links to the product's own pages. Search engines use them to recognise the brand.",
   },
 );
 

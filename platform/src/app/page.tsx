@@ -29,21 +29,37 @@ import { SiteFooter, SiteHeader } from "@/components/landing/site-chrome";
 import { StudioDemo } from "@/components/landing/studio-demo";
 import { TiltCard } from "@/components/landing/tilt-card";
 import { PlanGrid } from "@/components/pricing/plan-grid";
-import { PRODUCT_NAME } from "@/lib/brand";
+import { JsonLd } from "@/components/seo/json-ld";
+import { OPERATOR_NAME, OPERATOR_URL, PRODUCT_NAME, SUPPORT_EMAIL } from "@/lib/brand";
 import { db } from "@/lib/db";
 import { formatKES } from "@/lib/money";
 import { VIDEO_MAX_SECONDS, videoCreditsFor } from "@/lib/pricing";
 import { CLIENT_CASE, faqFor, HOW_IT_WORKS, SAMPLE_CLIPS, SHOWREEL, TARI_CLIPS, type Clip } from "@/lib/showcase";
+import { absoluteUrl, faqLd, organizationLd, pageMetadata, softwareApplicationLd, videoLd, websiteLd } from "@/lib/seo";
 import { getPricing } from "@/server/pricing-store";
+import { siteSeo } from "@/server/seo";
 
 export const dynamic = "force-dynamic";
 
+const homeDescription = (fromCents: number) =>
+  `Make AI video ads and posters in minutes, publish them to Facebook, Instagram and TikTok, and sell on WhatsApp. Plans from ${formatKES(fromCents)} a month; pay by M-Pesa or card.`;
+
 export async function generateMetadata(): Promise<Metadata> {
-  const pricing = await getPricing();
+  const [pricing, site] = await Promise.all([getPricing(), siteSeo()]);
   return {
-    title: { absolute: `${PRODUCT_NAME}: AI video and image ads for African brands` },
-    description: `Make AI video ads and posters in minutes, publish them, and sell on WhatsApp. Plans from ${formatKES(pricing.plans.BASIC.monthlyCents)} a month; pay by M-Pesa or card.`,
-    openGraph: { images: [{ url: SHOWREEL.poster }] },
+    ...pageMetadata({
+      title: `${PRODUCT_NAME}: AI video and image ads for African brands`,
+      absoluteTitle: true,
+      description: homeDescription(pricing.plans.BASIC.monthlyCents),
+      path: "/",
+      image: SHOWREEL.poster,
+      imageSize: { width: 960, height: 540 },
+      imageAlt: `${PRODUCT_NAME} showreel: AI video ads made for African brands`,
+      siteName: PRODUCT_NAME,
+      noindex: !site.indexable,
+    }),
+    keywords: ["AI video ads Kenya", "AI image ads", "M-Pesa", "WhatsApp marketing", "TikTok ads", "Instagram ads", "advertising agency tools", "Nairobi"],
+    ...(site.verification ? { verification: site.verification } : {}),
   };
 }
 
@@ -140,9 +156,33 @@ export default async function Home() {
   const portraitTari = TARI_CLIPS.filter((c) => c.orientation === "portrait");
   const wideTari = TARI_CLIPS.filter((c) => c.orientation === "landscape");
   const fromKes = Math.round(pricing.plans.BASIC.monthlyCents / 100);
+  const site = await siteSeo();
+  const structuredData = [
+    organizationLd({ name: PRODUCT_NAME, url: site.base, logo: absoluteUrl(site.base, "/icon.png"), email: SUPPORT_EMAIL, parentName: OPERATOR_NAME, parentUrl: OPERATOR_URL, sameAs: site.sameAs }),
+    websiteLd({ name: PRODUCT_NAME, url: site.base, description: homeDescription(pricing.plans.BASIC.monthlyCents) }),
+    softwareApplicationLd({
+      name: PRODUCT_NAME,
+      url: site.base,
+      description: homeDescription(pricing.plans.BASIC.monthlyCents),
+      image: absoluteUrl(site.base, SHOWREEL.poster),
+      offers: [
+        { name: "Free", monthlyCents: 0, description: "Top up credits as you go" },
+        ...(["BASIC", "PRO", "MAX"] as const).map((k) => ({ name: k.charAt(0) + k.slice(1).toLowerCase(), monthlyCents: pricing.plans[k].monthlyCents, description: `${pricing.plans[k].creditsPerMonth.toLocaleString("en-KE")} credits a month` })),
+      ],
+    }),
+    faqLd(faqFor(pricing).map((f) => ({ q: f.q, a: f.a }))),
+    videoLd({
+      name: `${PRODUCT_NAME} showreel`,
+      description: "Video and image ads made with AI for African brands: product spots, launch posters and social clips.",
+      thumbnailUrl: absoluteUrl(site.base, SHOWREEL.poster),
+      contentUrl: absoluteUrl(site.base, SHOWREEL.src),
+      uploadDate: "2026-10-02T09:00:00+03:00",
+    }),
+  ];
 
   return (
     <div className="theme-afro theme-afro-night min-h-screen overflow-x-clip bg-bg text-ink">
+      <JsonLd data={structuredData} />
       <SiteHeader />
 
       <main>

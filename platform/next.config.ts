@@ -55,6 +55,11 @@ const nextConfig: NextConfig = {
       // Brand art and the showcase clips change rarely: let browsers and CDNs keep them.
       { source: "/brand/:path*", headers: [{ key: "Cache-Control", value: longCache }] },
       { source: "/showcase/:path*", headers: [{ key: "Cache-Control", value: longCache }] },
+      // Never in search results: the API, private media links, tracked redirects and private order and payment pages.
+      ...["/api/:path*", "/media/:path*", "/l/:path*", "/order/:path*", "/pay/:path*"].map((source) => ({
+        source,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }],
+      })),
     ];
   },
 };

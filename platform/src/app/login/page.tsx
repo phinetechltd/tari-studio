@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+
+import { PRODUCT_NAME as SEO_PRODUCT } from "@/lib/brand";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -10,7 +13,12 @@ import { googleEnabled } from "@/server/oauth-google";
 
 import { LoginForm } from "./login-form";
 
-export const metadata: Metadata = { title: "Sign in" };
+export const metadata: Metadata = pageMetadata({
+  title: "Sign in",
+  description: `Sign in to ${SEO_PRODUCT} to make ads, schedule posts and answer customers.`,
+  path: "/login",
+  siteName: SEO_PRODUCT,
+});
 
 const REASONS: Record<string, string> = {
   google: "Google sign-in did not work. Try again, or use your email and password.",

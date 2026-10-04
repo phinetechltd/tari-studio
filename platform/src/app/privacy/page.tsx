@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 
+import { pageMetadata } from "@/lib/seo";
+
 import { LegalPage, Section } from "@/components/legal/legal-page";
 import { OPERATOR_NAME, OPERATOR_URL, PRODUCT_NAME, SUPPORT_EMAIL } from "@/lib/brand";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Privacy policy",
   description: `How ${PRODUCT_NAME}, managed by ${OPERATOR_NAME}, collects, uses and protects personal data.`,
-};
+  path: "/privacy",
+  siteName: PRODUCT_NAME,
+});
 export const dynamic = "force-static";
 
 /**

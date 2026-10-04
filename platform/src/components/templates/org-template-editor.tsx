@@ -2,7 +2,7 @@
 
 import { ExternalLink, Globe2, ImagePlus, LoaderIcon, Lock, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
 
 import { callApi } from "@/components/json-form";
 import { PinterestPicker, type PinChoice } from "@/components/pinterest/pinterest-picker";
@@ -33,6 +33,10 @@ export function OrgTemplateEditor({ initial }: { initial: OrgTemplateValues }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  // Images and moderation come from the server: follow them when the page refreshes after an upload or import.
+  useEffect(() => {
+    setV((s) => ({ ...s, images: initial.images, hidden: initial.hidden, hiddenReason: initial.hiddenReason }));
+  }, [initial.images, initial.hidden, initial.hiddenReason]);
   const othersPins = v.images.filter((i) => i.source && !i.source.owned).length;
   const set = <K extends keyof OrgTemplateValues>(k: K, val: OrgTemplateValues[K]) => setV((s) => ({ ...s, [k]: val }));
 

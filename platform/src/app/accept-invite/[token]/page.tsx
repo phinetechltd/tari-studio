@@ -6,7 +6,7 @@ import { previewInvite } from "@/server/invites";
 
 import { AcceptForm } from "./accept-form";
 
-export const metadata: Metadata = { title: "Accept invitation" };
+export const metadata: Metadata = { title: "Accept invitation", robots: { index: false, follow: false }, referrer: "no-referrer" };
 
 export default async function AcceptInvitePage({ params }: { params: Promise<{ token: string }> }) {
   const { token } = await params;

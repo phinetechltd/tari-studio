@@ -5,7 +5,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 
 import { VerifyForm } from "./verify-form";
 
-export const metadata: Metadata = { title: "Confirm your email" };
+export const metadata: Metadata = { title: "Confirm your email", robots: { index: false, follow: false } };
 export const dynamic = "force-dynamic";
 
 export default async function VerifyPage({ searchParams }: { searchParams: Promise<{ email?: string }> }) {

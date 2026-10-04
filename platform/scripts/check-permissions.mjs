@@ -50,6 +50,7 @@ const PUBLIC_ALLOWLIST = new Set([
   // then only triggers a verify by reference (src/server/payments.ts).
   "api/webhooks/paystack",
   "api/webhooks/tiktok",
+  "og",
   // The Paystack simulator's checkout: refused unless PAYSTACK_PROVIDER=simulator
   // outside production; it records a pretend outcome and triggers a verify.
   "api/payments/paystack/simulator",

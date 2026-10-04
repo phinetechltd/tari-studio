@@ -103,6 +103,12 @@ const schema = z.object({
   PINTEREST_APP_SECRET: z.string().optional(),
   /** "on" once Pinterest grants the app partner search (searching all of Pinterest, not just your own pins) */
   PINTEREST_PARTNER_SEARCH: z.enum(["on", "off"]).default("off"),
+  /** Google Search Console "HTML tag" verification code (the content="…" value only) */
+  GOOGLE_SITE_VERIFICATION: z.string().max(200).optional(),
+  /** Bing Webmaster Tools verification code (msvalidate.01) */
+  BING_SITE_VERIFICATION: z.string().max(200).optional(),
+  /** The product's official social profiles, comma-separated URLs (search engines link them to the site) */
+  SEO_SOCIAL_PROFILES: z.string().max(2000).optional(),
   GENERATION_PROVIDER: z.enum(["simulator", "higgsfield"]).default("simulator"),
   /** Higgsfield API credentials, "KEY_ID:KEY_SECRET" */
   HF_CREDENTIALS: z.string().optional(),

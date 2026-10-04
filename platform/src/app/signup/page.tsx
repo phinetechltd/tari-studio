@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+
+import { PRODUCT_NAME as SEO_PRODUCT } from "@/lib/brand";
+import { pageMetadata } from "@/lib/seo";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -9,7 +12,12 @@ import { googleEnabled } from "@/server/oauth-google";
 
 import { SignupForm } from "./signup-form";
 
-export const metadata: Metadata = { title: "Create your account" };
+export const metadata: Metadata = pageMetadata({
+  title: "Create your account",
+  description: `Start free with ${SEO_PRODUCT}: make AI video and image ads, publish them and answer customers on WhatsApp. No card needed to start.`,
+  path: "/signup",
+  siteName: SEO_PRODUCT,
+});
 export const dynamic = "force-dynamic";
 
 export default async function SignupPage() {
