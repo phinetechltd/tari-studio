@@ -1,0 +1,22 @@
+[Unit]
+Description=Tari Studio web
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+User=tari
+Group=tari
+WorkingDirectory=/var/www/tari-studio/app
+EnvironmentFile=/var/www/tari-studio/app/.env
+ExecStart=/usr/bin/node node_modules/next/dist/bin/next start -p 3400 -H 127.0.0.1
+Restart=always
+RestartSec=3
+MemoryMax=1200M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/www/tari-studio
+
+[Install]
+WantedBy=multi-user.target

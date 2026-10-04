@@ -152,3 +152,15 @@ People create their own accounts at `/signup` and confirm their email with a 6-d
 - nginx: turn on `gzip on;` for text, JSON and SVG; serve `/_next/static/` with `Cache-Control: public, max-age=31536000, immutable` (Next sets it; do not strip it); allow `client_max_body_size 12m;` for image uploads; keep TLS and HSTS in the server block (certbot). The app sets its own security headers and a Content-Security-Policy.
 - Backups: `pg_dump` nightly and a copy of `STORAGE_DIR`; keep at least 14 days. To restore: stop the web and worker services, `createdb` a fresh database, `psql` the dump into it, restore `STORAGE_DIR`, run `npx prisma migrate deploy`, start the services, then check `/api/health`. Test a restore before you need one.
 - Logs go to the service output (`journalctl -u agency-web -u agency-worker`); rotate them with the journal's size limit (`SystemMaxUse=`).
+
+## 14. Deploying to the shared VPS (taristudio.africa)
+
+The `deploy/` folder is the whole recipe; nothing in it touches the other sites on the server.
+
+1. **DNS first.** `taristudio.africa` and `www` need A records to the server's IP, served by the domain's *own* nameservers (a registrar zone that does not exist answers "query refused" and certificates cannot be issued).
+2. Copy the code to `/var/www/tari-studio/app` (git clone or upload; no `node_modules`, no `.env`).
+3. `sudo bash deploy/bootstrap-server.sh taristudio.africa` once. It adds Postgres (new packages only), a `tari` user, the `tari_studio` database, the two systemd units, one nginx site (validated and reloaded, never restarted), a nightly backup, and the HTTPS certificate when DNS already points at the server. It stops if port 3400 is taken.
+4. Edit `/var/www/tari-studio/app/.env`: add `SMTP_PASSWORD` (a Gmail app password) at least. Back up `CREDENTIALS_KEY`.
+5. `sudo bash deploy/deploy.sh` builds (low priority), backs up, runs migrations, restarts the two Tari units and waits for `/api/health`.
+6. First administrator: `ADMIN_EMAIL=you@example.com npx tsx --tsconfig scripts/tsconfig.json scripts/create-admin.ts` (as the `tari` user, with the `.env` loaded), then open `/forgot-password` to set a password and enrol an authenticator app.
+7. Add live keys under Platform admin -> Settings. Until then production refuses the simulators, so payments, generation and AI writing report "not configured" rather than pretending.

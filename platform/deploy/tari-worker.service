@@ -1,0 +1,24 @@
+[Unit]
+Description=Tari Studio worker (publishing, automations, generation, renewals, notifications)
+After=network.target postgresql.service
+Requires=postgresql.service
+
+[Service]
+User=tari
+Group=tari
+WorkingDirectory=/var/www/tari-studio/app
+EnvironmentFile=/var/www/tari-studio/app/.env
+ExecStart=/usr/bin/npm run worker
+KillSignal=SIGTERM
+TimeoutStopSec=60
+Restart=always
+RestartSec=3
+MemoryMax=800M
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/www/tari-studio
+
+[Install]
+WantedBy=multi-user.target
