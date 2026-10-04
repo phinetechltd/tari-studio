@@ -22,7 +22,7 @@ export function ResetForm({ token }: { token: string }) {
     } else setError(res.error?.message ?? "Could not reset the password.");
   }
   return (
-    <form onSubmit={submit} className="space-y-4">
+    <form method="post" onSubmit={submit} className="space-y-4">
       <PasswordField id="password" name="password" label="New password" autoComplete="new-password" showHint />
       {error ? (
         <p role="alert" className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">

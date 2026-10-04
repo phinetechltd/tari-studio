@@ -54,7 +54,7 @@ export function ForgotForm() {
   }
 
   return (
-    <form onSubmit={reset} className="space-y-4">
+    <form method="post" onSubmit={reset} className="space-y-4">
       <p role="status" className="rounded-lg border border-success/40 bg-success/10 px-3 py-2 text-sm text-success">
         If an account matches, a code is on its way. By email you also get a button that opens the reset page. The code works for 15 minutes.
       </p>
