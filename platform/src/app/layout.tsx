@@ -1,8 +1,8 @@
 import type { Metadata, Viewport } from "next";
-import { cookies } from "next/headers";
 import type { ReactNode } from "react";
 import { Bricolage_Grotesque, Inter, Poppins } from "next/font/google";
 
+import { CookieNotice } from "@/components/legal/cookie-notice";
 import { PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/brand";
 import { THEME_COOKIE } from "@/lib/theme";
 
@@ -33,34 +33,42 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.APP_BASE_URL || "http://localhost:3400"),
   title: { default: PRODUCT_NAME, template: `%s · ${PRODUCT_NAME}` },
   description: PRODUCT_TAGLINE,
+  applicationName: PRODUCT_NAME,
+  icons: { icon: [{ url: "/icon.png", type: "image/png", sizes: "512x512" }, { url: "/favicon.ico", sizes: "any" }], apple: "/apple-icon.png" },
+  openGraph: { siteName: PRODUCT_NAME, type: "website", images: [{ url: "/brand/tari-afro-stacked.png" }] },
 };
 
-/** The visitor's light/dark choice, set by the theme toggle. Unknown values fall back to dark. */
-async function chosenTheme(): Promise<"dark" | "light"> {
-  const value = (await cookies()).get(THEME_COOKIE)?.value;
-  return value === "light" ? "light" : "dark";
-}
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#fdf7ed" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f0805" },
+  ],
+};
 
-export async function generateViewport(): Promise<Viewport> {
-  const light = (await chosenTheme()) === "light";
-  return {
-    width: "device-width",
-    initialScale: 1,
-    themeColor: light ? "#fdf7ed" : "#0f0805",
-    colorScheme: light ? "light" : "dark",
-  };
-}
+/**
+ * Runs before the first paint: reads the visitor's saved theme from the cookie
+ * and sets the class, so there is no flash and the layout stays static (reading
+ * cookies on the server would make every page dynamic). Dark is the default.
+ */
+const THEME_SCRIPT = `(function(){try{var m=document.cookie.match(/(?:^|; )${THEME_COOKIE}=(light|dark)/);var l=m&&m[1]==="light";var r=document.documentElement;if(l){r.classList.add("theme-afro-light");}r.dataset.theme=l?"light":"dark";}catch(e){}})();`;
 
-export default async function RootLayout({ children }: { children: ReactNode }) {
-  const theme = await chosenTheme();
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html
       lang="en"
-      data-theme={theme}
+      data-theme="dark"
       suppressHydrationWarning
-      className={`theme-afro ${theme === "light" ? "theme-afro-light" : ""} ${inter.variable} ${poppins.variable} ${display.variable}`}
+      className={`theme-afro ${inter.variable} ${poppins.variable} ${display.variable}`}
     >
-      <body className="min-h-screen bg-surface text-ink antialiased font-sans">{children}</body>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
+      <body className="min-h-screen bg-surface text-ink antialiased font-sans">
+        {children}
+        <CookieNotice />
+      </body>
     </html>
   );
 }

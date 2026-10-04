@@ -56,7 +56,7 @@ export function Hint({ id, title, children, className }: { id: string; title: st
           <button type="button" onClick={() => ctx.dismiss(id)} className="btn-primary min-h-[34px] px-3 text-xs">
             Got it
           </button>
-          <button type="button" onClick={ctx.turnOff} className="min-h-[34px] rounded-full px-3 text-xs text-ink/70 hover:bg-white/[0.06] hover:text-ink">
+          <button type="button" onClick={ctx.turnOff} className="min-h-[34px] rounded-full px-3 text-xs text-ink/70 hover:bg-wash/[0.06] hover:text-ink">
             Turn off tips
           </button>
         </div>
@@ -65,7 +65,7 @@ export function Hint({ id, title, children, className }: { id: string; title: st
         type="button"
         onClick={() => ctx.dismiss(id)}
         aria-label="Dismiss tip"
-        className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-ink/60 hover:bg-white/[0.06] hover:text-ink"
+        className="absolute right-2 top-2 inline-flex h-8 w-8 items-center justify-center rounded-full text-ink/60 hover:bg-wash/[0.06] hover:text-ink"
       >
         <X className="h-4 w-4" />
       </button>

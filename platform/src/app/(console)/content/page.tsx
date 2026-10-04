@@ -1,7 +1,5 @@
-import { Hint } from "@/components/hints/hint";
 import { StudioApp } from "@/components/studio/studio-app";
 import type { ThreadDetail } from "@/components/studio/types";
-import { PageHeader } from "@/components/ui";
 import { ApiError } from "@/lib/api";
 import { can } from "@/lib/rbac";
 import { requirePermission } from "@/lib/session";
@@ -48,13 +46,6 @@ export default async function VideoStudioPage({ searchParams }: { searchParams: 
 
   return (
     <>
-      <PageHeader
-        title="Video Studio"
-        subtitle={`Describe it, check the quote, generate. An image is ${pricing.imageCredits} credits; video is ${pricing.videoCreditsPerStep} credits per started ${pricing.videoStepSeconds} seconds.`}
-      />
-      <Hint id="studio.intro" title="Describe it, check the quote, then generate">
-        Type what you want, or start with /video or /image. You get a quote with the model, length, shape and credit cost; nothing is charged until you press Generate, and a failed render is refunded.
-      </Hint>
       <StudioApp
         initialThreads={threads}
         initialDetail={detail}

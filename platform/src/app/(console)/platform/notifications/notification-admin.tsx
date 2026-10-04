@@ -102,7 +102,7 @@ export function PolicyMatrix({ events, policy, smsMode, emailMode }: { events: P
                       <td key={c} className="px-4 py-2.5 text-center">
                         <input
                           type="checkbox"
-                          className="h-4 w-4 accent-violet-500"
+                          className="h-4 w-4 accent-primary"
                           aria-label={`${e.label}: ${c === "IN_APP" ? "in the app" : c === "EMAIL" ? "email" : "SMS"}`}
                           checked={state[e.key]?.[c] ?? false}
                           disabled={busy}

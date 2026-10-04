@@ -165,7 +165,7 @@ export async function acceptInvite(input: {
       existingId ??
       (
         await tx.user.create({
-          data: { email: invite.email, name: newUser!.name, passwordHash: newUser!.passwordHash },
+          data: { email: invite.email, name: newUser!.name, passwordHash: newUser!.passwordHash, emailVerifiedAt: new Date() },
           select: { id: true },
         })
       ).id;
@@ -176,6 +176,8 @@ export async function acceptInvite(input: {
       update: { role: invite.role, status: "ACTIVE" },
     });
     await tx.user.update({ where: { id }, data: { activeOrganizationId: invite.organizationId } });
+    // The invite went to this address and they opened it, so the address is proven.
+    await tx.user.updateMany({ where: { id, emailVerifiedAt: null }, data: { emailVerifiedAt: new Date() } });
     return id;
   });
 

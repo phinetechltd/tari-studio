@@ -119,7 +119,7 @@ export function QuoteCard({
                 onClick={() => void run(() => onPatch({ mode: m }))}
                 className={cn(
                   "min-h-[32px] rounded-md px-3",
-                  meta.mode === m ? "bg-white text-neutral-950" : "text-ink/60 hover:text-white",
+                  meta.mode === m ? "bg-primary text-onprimary" : "text-ink/60 hover:text-ink",
                 )}
                 aria-pressed={meta.mode === m}
               >
@@ -137,7 +137,7 @@ export function QuoteCard({
           <label className="sr-only" htmlFor={`prompt-${message.id}`}>Prompt</label>
           <textarea
             id={`prompt-${message.id}`}
-            className="min-h-[88px] w-full rounded-lg border border-wash/10 bg-black/30 p-3 text-sm text-ink/90 focus:outline-none focus:ring-2 focus:ring-violet-500/40"
+            className="min-h-[88px] w-full rounded-lg border border-wash/10 bg-wash/[0.05] p-3 text-sm text-ink/90 focus:outline-none focus:ring-2 focus:ring-primary/40"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             maxLength={2000}
@@ -145,7 +145,7 @@ export function QuoteCard({
           <div className="mt-2 flex gap-2">
             <button
               type="button"
-              className="min-h-[36px] rounded-lg bg-white px-3 text-xs font-medium text-neutral-950"
+              className="min-h-[36px] rounded-lg bg-primary px-3 text-xs font-medium text-onprimary"
               disabled={busy || draft.trim().length < 3}
               onClick={() => void run(async () => {
                 await onPatch({ prompt: draft });
@@ -162,7 +162,7 @@ export function QuoteCard({
       ) : (
         <p className="mt-2 text-ink/60">
           &ldquo;{meta.prompt}&rdquo;{" "}
-          <button type="button" className="inline-flex items-center gap-1 text-xs text-violet-300 hover:text-violet-200" onClick={() => setEditing(true)}>
+          <button type="button" className="inline-flex items-center gap-1 text-xs text-primary hover:text-primary" onClick={() => setEditing(true)}>
             <Pencil className="h-3 w-3" /> Edit
           </button>
         </p>
@@ -181,7 +181,7 @@ export function QuoteCard({
                 className="mt-1 min-h-[36px] w-full rounded-lg border border-wash/10 bg-wash/[0.06] px-2 text-sm text-ink"
               >
                 {options.map((m) => (
-                  <option key={m.key} value={m.key} className="bg-neutral-900">
+                  <option key={m.key} value={m.key} className="bg-raised">
                     {m.label}
                     {m.description ? ` · ${m.description}` : ""}
                   </option>
@@ -206,7 +206,7 @@ export function QuoteCard({
                   disabled={busy}
                   aria-pressed={seconds === c}
                   onClick={() => c !== meta.seconds && void run(() => onPatch({ seconds: c }))}
-                  className={cn("min-h-[36px] rounded-lg px-3 text-sm", seconds === c ? "bg-white text-neutral-950" : "bg-wash/[0.06] text-ink/70 hover:text-white")}
+                  className={cn("min-h-[36px] rounded-lg px-3 text-sm", seconds === c ? "bg-primary text-onprimary" : "bg-wash/[0.06] text-ink/70 hover:text-ink")}
                 >
                   {c} s
                 </button>
@@ -228,7 +228,7 @@ export function QuoteCard({
               onChange={(e) => setSeconds(Number(e.target.value))}
               onPointerUp={() => seconds !== meta.seconds && void run(() => onPatch({ seconds }))}
               onKeyUp={() => seconds !== meta.seconds && void run(() => onPatch({ seconds }))}
-              className="w-full accent-violet-400"
+              className="w-full accent-primary"
             />
           </div>
         ) : null}
@@ -244,7 +244,7 @@ export function QuoteCard({
                 className="mt-1 min-h-[36px] w-full rounded-lg border border-wash/10 bg-wash/[0.06] px-2 text-sm text-ink"
               >
                 {shapes.map((r) => (
-                  <option key={r} value={r} className="bg-neutral-900">
+                  <option key={r} value={r} className="bg-raised">
                     {r}
                   </option>
                 ))}
@@ -257,12 +257,12 @@ export function QuoteCard({
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-violet-500/20 px-3 py-1 text-xs text-violet-200">
+        <span className="rounded-full bg-primary/20 px-3 py-1 text-xs text-primary">
           {cost.credits} credits
         </span>
         <span className="rounded-full bg-wash/[0.08] px-3 py-1 text-xs text-ink/80">{formatKES(cost.cents)} value</span>
         {balances?.unmetered && <span className="text-xs text-ink/40">Not charged on your plan</span>}
-        {producingOrder && <span className="text-xs text-amber-200">For order {producingOrder}</span>}
+        {producingOrder && <span className="text-xs text-warning">For order {producingOrder}</span>}
       </div>
 
       <div className="mt-4 flex flex-wrap gap-2">
@@ -270,7 +270,7 @@ export function QuoteCard({
           <button
             type="button"
             onClick={() => onBuy(cost.credits - have)}
-            className="min-h-[40px] rounded-lg bg-white px-4 text-sm font-medium text-neutral-950 hover:bg-wash/90"
+            className="min-h-[40px] rounded-lg bg-primary px-4 text-sm font-medium text-onprimary hover:bg-primary/90"
           >
             Top up {cost.credits - have} more credits to generate
           </button>
@@ -279,7 +279,7 @@ export function QuoteCard({
             type="button"
             disabled={busy}
             onClick={() => void run(onGenerate)}
-            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-white px-4 text-sm font-medium text-neutral-950 hover:bg-wash/90 disabled:opacity-60"
+            className="inline-flex min-h-[40px] items-center gap-2 rounded-lg bg-primary px-4 text-sm font-medium text-onprimary hover:bg-primary/90 disabled:opacity-60"
           >
             {busy ? <LoaderIcon className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
             Generate
@@ -328,7 +328,7 @@ export function GenerationCard({
   return (
     <div className="max-w-[92%] overflow-hidden rounded-2xl rounded-bl-sm border border-wash/[0.1] bg-wash/[0.04] text-sm text-ink/80">
       {asset.status === "GENERATING" && (
-        <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-violet-500/10 via-transparent to-indigo-500/10">
+        <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-primary/10 via-warning/5 to-danger/10">
           <div className="text-center" role="status">
             <LoaderIcon className="mx-auto h-6 w-6 animate-spin text-ink/70" />
             <p className="mt-3 text-ink/80">Generating {isVideo ? `a ${asset.durationSeconds ?? ""}-second video` : "an image"}…</p>
@@ -355,7 +355,7 @@ export function GenerationCard({
 
       {asset.status === "FAILED" && (
         <div className="flex items-start gap-3 p-4">
-          <CircleX className="mt-0.5 h-5 w-5 shrink-0 text-red-300" />
+          <CircleX className="mt-0.5 h-5 w-5 shrink-0 text-danger" />
           <div>
             <p className="text-ink/90">This one did not work.</p>
             <p className="mt-1 text-ink/60">{asset.error ?? "The generation failed."}</p>

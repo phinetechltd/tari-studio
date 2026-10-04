@@ -29,7 +29,7 @@ export default async function PaystackSimulatorPage({ searchParams }: { searchPa
     <main className="flex min-h-screen items-center justify-center bg-[#0b1220] px-4 py-12 text-white">
       <div className="w-full max-w-sm rounded-3xl bg-white p-6 text-neutral-900 shadow-2xl">
         <div className="flex items-center justify-between">
-          <BrandLogo tone="light" height={28} />
+          <BrandLogo tone="afro" height={28} />
           <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-semibold uppercase text-amber-800">Simulator</span>
         </div>
         <p className="mt-6 text-sm text-neutral-500">{intent.email}</p>

@@ -48,7 +48,7 @@ export async function usageReport(days = 30, now = new Date()) {
         failed: failed.get(key) ?? 0,
         customerCredits: r._sum.tokensCharged ?? 0,
         providerCredits: fromMilli(-(c?.milliCredits ?? 0)),
-        providerUsd: -(c?.usdMicros ?? 0) / 1_000_000,
+        providerUsd: -(c?.usdMicros ?? 0) / 1_000_000 + 0,
       };
     })
     .sort((a, b) => b.providerCredits - a.providerCredits || b.generations - a.generations);

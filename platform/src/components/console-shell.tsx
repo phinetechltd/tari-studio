@@ -26,6 +26,7 @@ export type NavIcon =
   | "brands"
   | "catalogue"
   | "templates"
+  | "teams"
   | "characters"
   | "orders"
   | "tasks"
@@ -72,6 +73,7 @@ export const NAV: NavItem[] = [
   { href: "/platform/pricing", label: "Pricing", icon: "catalogue", group: "Account", scope: "platform" },
   { href: "/platform/ai", label: "AI & credits", icon: "ai", group: "Account", scope: "platform" },
   { href: "/platform/notifications", label: "Notifications", icon: "bell", group: "Account", scope: "platform" },
+  { href: "/app/teams", label: "My teams", icon: "teams", group: "Account", scope: "tenant" },
   { href: "/app/team", label: "Team", icon: "team", group: "Account", permission: "member:read", scope: "tenant" },
   { href: "/billing", label: "Plan & billing", icon: "billing", group: "Account", permission: "org:read", scope: "tenant" },
   { href: "/setup", label: "Get started", icon: "setup", group: "Account", permission: "org:write", scope: "tenant" },

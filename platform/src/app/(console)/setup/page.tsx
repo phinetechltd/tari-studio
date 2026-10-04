@@ -20,7 +20,7 @@ export default async function SetupPage() {
   return (
     <>
       <PageHeader title={`Get started with ${PRODUCT_NAME}`} subtitle="A few steps to a workspace that makes ads, posts them and answers customers. Do them in any order; each ticks itself when it's done." />
-      <SetupWizard steps={progress.steps} canEdit={canEdit} dismissed={progress.dismissed} />
+      <SetupWizard steps={progress.steps} canEdit={canEdit} dismissed={progress.dismissed} guideOff={progress.guideOff} />
     </>
   );
 }

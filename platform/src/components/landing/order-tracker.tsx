@@ -80,7 +80,12 @@ export function OrderTracker({ initial, paystack = false }: { initial: TrackedOr
   useEffect(() => {
     if (!waitingForPayment && !inProduction && !awaitingPrice) return;
     // Fast while a prompt is on the phone, slow while the team produces.
-    const t = setInterval(() => void refresh(), waitingForPayment ? 3000 : 30000);
+    const t = setInterval(
+      () => {
+        if (!document.hidden) void refresh();
+      },
+      waitingForPayment ? 3000 : 30000,
+    );
     return () => clearInterval(t);
   }, [waitingForPayment, inProduction, awaitingPrice, refresh]);
 

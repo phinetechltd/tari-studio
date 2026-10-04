@@ -56,6 +56,10 @@ const schema = z.object({
   AI_TIMEOUT_SEC: z.coerce.number().int().positive().default(45),
   /** Meta app (Facebook Login, Pages, Instagram, WhatsApp Cloud API). Required when META_PROVIDER=graph. */
   META_APP_ID: z.string().optional(),
+  GOOGLE_CLIENT_ID: z.string().optional(),
+  GOOGLE_CLIENT_SECRET: z.string().optional(),
+  /** Set to "false" to hide the Google button without removing the keys */
+  GOOGLE_AUTH_ENABLED: z.string().optional(),
   META_APP_SECRET: z.string().optional(),
   /** Graph API version, e.g. v23.0. Update when Meta retires the one in use. */
   META_GRAPH_VERSION: z.string().regex(/^v\d+\.\d+$/).default("v23.0"),

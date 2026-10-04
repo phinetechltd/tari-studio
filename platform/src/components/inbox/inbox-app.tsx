@@ -100,6 +100,7 @@ export function InboxApp(props: Props) {
   }, [loadList]);
   useEffect(() => {
     const t = setInterval(() => {
+      if (document.hidden) return;
       void loadList();
       if (activeId) void loadDetail(activeId);
     }, 8000);

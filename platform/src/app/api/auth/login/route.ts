@@ -1,7 +1,9 @@
 import { z } from "zod";
 
-import { ApiError, fail, handler, ok, parseBody } from "@/lib/api";
-import { activeMemberships, authenticate, claimsFor, organisationForLogin, setSessionCookie } from "@/lib/auth";
+import { fail, handler, ok, parseBody } from "@/lib/api";
+import { activeMemberships, authenticate, startSession } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { resendVerification } from "@/server/accounts";
 
 const body = z.object({
   email: z.string().min(1).max(254),
@@ -22,15 +24,18 @@ export const POST = handler({ public: true }, async ({ request }) => {
     return fail(401, "INVALID_CREDENTIALS", "Email or password is incorrect.");
   }
 
-  const org = await organisationForLogin(result.user);
-  if (org === null && !result.user.isPlatformAdmin) {
-    throw new ApiError(403, "NO_ORGANISATION", "This account is not part of any active organisation.");
+  // A password proves the person knows it, not that the address is theirs: new accounts confirm the email first.
+  const verified = await db.user.findUnique({ where: { id: result.user.id }, select: { emailVerifiedAt: true } });
+  if (!verified?.emailVerifiedAt) {
+    await resendVerification(result.user.email).catch(() => undefined);
+    return fail(403, "EMAIL_UNVERIFIED", "Confirm your email address first. We have sent you a new code.", { email: result.user.email });
   }
 
-  await setSessionCookie(claimsFor(result.user, org));
+  // Someone with no team yet still signs in; the welcome screen lets them create or pick one.
+  const { next } = await startSession(result.user);
   const memberships = await activeMemberships(result.user.id);
   return ok({
-    next: org === null ? "/platform" : "/app",
+    next,
     user: { name: result.user.name, email: result.user.email },
     organisations: memberships.map((m) => ({ id: m.organizationId, name: m.organization.name, role: m.role })),
   });

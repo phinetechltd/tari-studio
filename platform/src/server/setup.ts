@@ -106,6 +106,8 @@ export interface SetupProgress {
   complete: boolean;
   dismissed: boolean;
   seen: boolean;
+  /** This person has switched the setup guide off for themselves */
+  guideOff: boolean;
 }
 
 /** Where an organisation is with getting started, from what actually exists. */
@@ -113,7 +115,7 @@ export async function setupProgress(principal: Principal & { organizationId: str
   const orgId = principal.organizationId;
   const [org, me, brands, items, sub, purchases, channels, members, invites, assets] = await Promise.all([
     db.organization.findUniqueOrThrow({ where: { id: orgId }, select: { setupState: true, plan: true } }),
-    db.user.findUnique({ where: { id: principal.userId }, select: { phone: true } }),
+    db.user.findUnique({ where: { id: principal.userId }, select: { phone: true, setupGuideOff: true } }),
     db.brand.count({ where: { organizationId: orgId } }),
     db.catalogueItem.count({ where: { organizationId: orgId } }),
     db.subscription.findUnique({ where: { organizationId: orgId }, select: { status: true } }),
@@ -146,6 +148,7 @@ export async function setupProgress(principal: Principal & { organizationId: str
     complete: finished === steps.length,
     dismissed: state.dismissed === true,
     seen: Boolean(state.seenAt),
+    guideOff: me?.setupGuideOff === true,
   };
 }
 
@@ -157,6 +160,8 @@ export async function setupProgress(principal: Principal & { organizationId: str
 export async function shouldOpenWizard(principal: Principal & { organizationId: string }): Promise<boolean> {
   // Owners only: a platform admin visiting the workspace must not use up the Owner's first visit.
   if (principal.role !== "OWNER") return false;
+  const me = await db.user.findUnique({ where: { id: principal.userId }, select: { setupGuideOff: true } });
+  if (me?.setupGuideOff) return false;
   const org = await db.organization.findUnique({ where: { id: principal.organizationId }, select: { setupState: true } });
   const state = parseState(org?.setupState);
   return !state.seenAt && !state.dismissed;
@@ -174,11 +179,18 @@ export const setupPatchSchema = z.union([
   z.object({ skip: z.enum(STEP_KEYS as [StepKey, ...StepKey[]]) }),
   z.object({ unskip: z.enum(STEP_KEYS as [StepKey, ...StepKey[]]) }),
   z.object({ dismissed: z.boolean() }),
+  /** Personal: switch the setup guide off (or back on) for me, in every team */
+  z.object({ guideOff: z.boolean() }),
 ]);
 
 export async function updateSetup(principal: Principal & { organizationId: string }, raw: unknown, request?: Request): Promise<SetupProgress> {
-  if (principal.role !== "OWNER" && principal.role !== "SUPER_ADMIN") throw new ApiError(403, "FORBIDDEN", "Only an Owner changes the setup checklist.");
   const input = setupPatchSchema.parse(raw);
+  if ("guideOff" in input) {
+    // Anyone may put the guide away for themselves; it changes nothing for the team.
+    await db.user.update({ where: { id: principal.userId }, data: { setupGuideOff: input.guideOff } });
+    return setupProgress(principal);
+  }
+  if (principal.role !== "OWNER" && principal.role !== "SUPER_ADMIN") throw new ApiError(403, "FORBIDDEN", "Only an Owner changes the setup checklist.");
   const org = await db.organization.findUniqueOrThrow({ where: { id: principal.organizationId }, select: { setupState: true } });
   const state = parseState(org.setupState);
   if ("skip" in input) state.skipped = Array.from(new Set([...(state.skipped ?? []), input.skip]));

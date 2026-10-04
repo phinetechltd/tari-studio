@@ -43,7 +43,8 @@ export function monthKeyEAT(now = new Date()): string {
 }
 
 const toMilli = (credits: number) => Math.round(credits * 1000);
-export const fromMilli = (milli: number) => milli / 1000;
+/** Thousandths to credits; never "-0" (a negated zero sum). */
+export const fromMilli = (milli: number) => milli / 1000 + 0;
 
 // ── the ledger ───────────────────────────────────────────────────────────
 

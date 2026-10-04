@@ -81,6 +81,16 @@ model User {
   email                   String                   @unique
   name                    String
   passwordHash            String
+  /// False for people who signed up with Google only: passwordHash is then a random unusable value
+  hasPassword             Boolean                  @default(true)
+  /// Set when the person proves they own the address (code or link, Google, or accepting an invite)
+  emailVerifiedAt         DateTime?
+  /// Set when the person proves they own the phone (SMS code); only a verified phone is used for SMS recovery
+  phoneVerifiedAt         DateTime?
+  /// Whether this person has dismissed the setup wizard for good (per person, across teams)
+  setupGuideOff           Boolean                  @default(false)
+  authIdentities          AuthIdentity[]
+  authTokens              AuthToken[]
   /// ACTIVE | SUSPENDED
   status                  String                   @default("ACTIVE")
   /// Platform staff. Not a membership role: it is not granted inside an org.
@@ -1674,4 +1684,46 @@ model CampaignCharacter {
 
   @@id([campaignId, characterId])
   @@index([characterId])
+}
+
+
+/// A way of signing in that is not a password: today Google.
+model AuthIdentity {
+  id        String   @id @default(cuid())
+  userId    String
+  /// GOOGLE
+  provider  String
+  /// The provider's stable id for the person (Google "sub")
+  subject   String
+  email     String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, subject])
+  @@index([userId])
+}
+
+/// One-time proof sent by email or SMS: verify an email or phone, reset a
+/// password, or sign in without one. It can be used by the 6-digit code or by
+/// the link; both are stored only as hashes. Single use, short life, limited tries.
+model AuthToken {
+  id        String    @id @default(cuid())
+  userId    String
+  /// VERIFY_EMAIL | VERIFY_PHONE | RESET_PASSWORD | LOGIN_CODE
+  purpose   String
+  /// EMAIL | SMS
+  channel   String
+  /// Where it was sent (address or canonical phone)
+  target    String
+  codeHash  String
+  /// SHA-256 of the link token; null for SMS (code only)
+  linkHash  String?   @unique
+  expiresAt DateTime
+  attempts  Int       @default(0)
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, purpose, usedAt])
+  @@index([expiresAt])
 }

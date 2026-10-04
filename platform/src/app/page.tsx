@@ -16,7 +16,6 @@ import {
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import type { ReactNode } from "react";
 
 import { KenteDivider, Mandala, Savanna, SunDisc } from "@/components/landing/afro-art";
@@ -30,7 +29,6 @@ import { SiteFooter, SiteHeader } from "@/components/landing/site-chrome";
 import { StudioDemo } from "@/components/landing/studio-demo";
 import { TiltCard } from "@/components/landing/tilt-card";
 import { PlanGrid } from "@/components/pricing/plan-grid";
-import { getSessionPrincipal } from "@/lib/auth";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { db } from "@/lib/db";
 import { formatKES } from "@/lib/money";
@@ -130,9 +128,6 @@ function SectionHead({ eyebrow, title, children, center }: { eyebrow?: string; t
  * workspace.
  */
 export default async function Home() {
-  const principal = await getSessionPrincipal();
-  if (principal) redirect(principal.organizationId === null ? "/platform" : "/app");
-
   const pricing = await getPricing();
   const pinned = await db.generatedAsset.findMany({
     where: { showcase: true, status: "READY", archivedAt: null, storageKey: { not: null } },
@@ -178,8 +173,8 @@ export default async function Home() {
                 Video and image ads for African brands, made in minutes. Publish to Facebook and Instagram, answer on WhatsApp, and see which ad brought the sale.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-                <Link href="/pricing" className="btn-primary shine relative min-h-[54px] overflow-hidden px-8 text-base font-semibold">
-                  Start creating <ArrowRight className="h-5 w-5" />
+                <Link href="/signup" className="btn-primary shine relative min-h-[54px] overflow-hidden px-8 text-base font-semibold">
+                  Create a free account <ArrowRight className="h-5 w-5" />
                 </Link>
                 <Link href="#order" className="inline-flex min-h-[54px] items-center justify-center gap-2 rounded-full border border-primary/40 bg-wash/5 px-7 text-base font-semibold text-white backdrop-blur hover:bg-primary/15">
                   Have us make it for you

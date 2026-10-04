@@ -112,7 +112,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <Hint id="home.welcome" title="Welcome. Here is how it fits together">
         Make an ad in the <strong>Studio</strong> (you see the credit cost before anything is made), keep it in the <strong>Library</strong>, post it from <strong>Social</strong>, and answer the replies in the <strong>Inbox</strong>. The bell at the top shows payments, reminders and alerts.
       </Hint>
-      {setup && !setup.complete && !setup.dismissed ? (
+      {setup && !setup.complete && !setup.dismissed && !setup.guideOff ? (
         <Link href="/setup" className="card flex flex-wrap items-center gap-4 p-5 hover:border-primary/40">
           <div className="min-w-0 flex-1">
             <p className="font-semibold">Finish setting up</p>

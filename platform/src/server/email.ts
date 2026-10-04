@@ -50,6 +50,8 @@ const consoleProvider: EmailProvider = {
   async send(message) {
     outbox.push(message);
     console.info(`[email:console] ${PRODUCT_EMAIL_FROM_NAME} → ${message.to}: ${message.subject}`);
+    // Development only (the stand-in is refused in production): show the body so codes and links can be used.
+    if (process.env.NODE_ENV !== "test") console.info(message.text.split(String.fromCharCode(10)).map((l) => `    | ${l}`).join(String.fromCharCode(10)));
     return { ok: true, mock: true, provider: "console", id: `console-${outbox.length}` };
   },
 };
@@ -145,15 +147,24 @@ const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;")
 export function renderEmail(opts: { product: string; title: string; body?: string | null; action?: { label: string; url: string } | null; footer?: string | null }): { text: string; html: string } {
   const paragraphs = (opts.body ?? "").split(/\n{2,}|\n/).map((p) => p.trim()).filter(Boolean);
   const text = [opts.title, "", ...paragraphs, ...(opts.action ? ["", `${opts.action.label}: ${opts.action.url}`] : []), ...(opts.footer ? ["", "--", opts.footer] : [])].join("\n");
-  const html = `<!doctype html><html><body style="margin:0;background:#f4f4f5;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#18181b">
+  const base = env().APP_BASE_URL.replace(/\/$/, "");
+  const para = (p: string) => {
+    const code = /^Your code: (\d{6})$/.exec(p);
+    if (code) {
+      return `<p style="margin:6px 0 16px;text-align:center"><span style="display:inline-block;background:#fdf3dc;border:2px dashed #f5a623;border-radius:12px;padding:12px 22px;font-family:'Courier New',monospace;font-size:30px;font-weight:bold;letter-spacing:8px;color:#1e0c04">${code[1]}</span></p>`;
+    }
+    return `<p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#3a2a1e">${escapeHtml(p)}</p>`;
+  };
+  const html = `<!doctype html><html><body style="margin:0;background:#f6efe2;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;color:#1e0c04">
 <table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center">
 <table role="presentation" width="100%" style="max-width:560px;background:#ffffff;border-radius:14px;overflow:hidden" cellspacing="0" cellpadding="0">
-<tr><td style="background:#0a0a0a;padding:18px 24px;color:#ffffff;font-weight:bold;font-size:16px;letter-spacing:.3px">${escapeHtml(opts.product)}</td></tr>
+<tr><td style="background:#0f0805;padding:18px 24px"><img src="${base}/brand/tari-afro-horizontal.png" alt="${escapeHtml(opts.product)}" height="30" style="height:30px;display:block;border:0" /></td></tr>
+<tr><td style="padding:0"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td height="6" width="25%" style="background:#f5a623;font-size:0;line-height:0">&nbsp;</td><td height="6" width="25%" style="background:#1f8a4c;font-size:0;line-height:0">&nbsp;</td><td height="6" width="25%" style="background:#c8321e;font-size:0;line-height:0">&nbsp;</td><td height="6" width="25%" style="background:#0f0805;font-size:0;line-height:0">&nbsp;</td></tr></table></td></tr>
 <tr><td style="padding:28px 24px 8px"><h1 style="margin:0 0 12px;font-size:20px;line-height:1.3">${escapeHtml(opts.title)}</h1>
-${paragraphs.map((p) => `<p style="margin:0 0 12px;font-size:15px;line-height:1.55;color:#3f3f46">${escapeHtml(p)}</p>`).join("\n")}
-${opts.action ? `<p style="margin:20px 0 8px"><a href="${escapeHtml(opts.action.url)}" style="display:inline-block;background:#7c3aed;color:#ffffff;text-decoration:none;font-weight:bold;padding:12px 20px;border-radius:999px;font-size:14px">${escapeHtml(opts.action.label)}</a></p>` : ""}
+${paragraphs.map(para).join("\n")}
+${opts.action ? `<p style="margin:20px 0 8px"><a href="${escapeHtml(opts.action.url)}" style="display:inline-block;background:#f5a623;color:#1e0c04;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:999px;font-size:14px">${escapeHtml(opts.action.label)}</a></p>` : ""}
 </td></tr>
-${opts.footer ? `<tr><td style="padding:16px 24px 24px;font-size:12px;line-height:1.5;color:#71717a;border-top:1px solid #f4f4f5">${escapeHtml(opts.footer)}</td></tr>` : ""}
+${opts.footer ? `<tr><td style="padding:16px 24px 24px;font-size:12px;line-height:1.5;color:#7a6a5a;border-top:1px solid #f1e7d6">${escapeHtml(opts.footer)}</td></tr>` : ""}
 </table></td></tr></table></body></html>`;
   return { text, html };
 }

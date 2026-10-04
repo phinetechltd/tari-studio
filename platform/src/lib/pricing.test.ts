@@ -126,3 +126,66 @@ describe("pricing", () => {
     for (const x of EXTRAS) assert.equal(x.priceCents, null);
   });
 });
+
+describe("pricing: every length, count and rate stays whole and monotonic", () => {
+  it("charges per started 5 seconds, never less for longer, for every length from 4 to 30 s", () => {
+    let last = 0;
+    for (let s = 4; s <= 30; s++) {
+      const credits = videoCreditsFor(P, s);
+      assert.equal(credits, Math.ceil(s / 5) * P.videoCreditsPerStep, `${s} s`);
+      assert.ok(credits >= last, `${s} s costs at least as much as ${s - 1} s`);
+      last = credits;
+    }
+    assert.equal(videoCreditsFor(P, 5), videoCreditsFor(P, 4), "4 s and 5 s are one step");
+    assert.equal(videoCreditsFor(P, 6), 2 * P.videoCreditsPerStep, "the 6th second starts a second step");
+  });
+
+  it("prices every order from 1 to 20 images and every clip in whole shillings", () => {
+    for (let n = 1; n <= 20; n++) {
+      const q = quoteCreditOrder(P, { kind: "IMAGE", images: n });
+      assert.equal(q.credits, n * P.imageCredits);
+      assert.equal(q.amountCents % 100, 0, `${n} images: whole shillings`);
+      assert.ok(q.amountCents >= (q.credits * P.creditValueCents) - 1e-6, "never rounds below the credits' value");
+    }
+    for (let s = 4; s <= 30; s++) {
+      const q = quoteCreditOrder(P, { kind: "VIDEO", seconds: s });
+      assert.equal(q.amountCents % 100, 0, `${s} s: whole shillings`);
+    }
+  });
+
+  it("refuses counts and lengths outside the range, and fractions", () => {
+    assert.throws(() => quoteCreditOrder(P, { kind: "IMAGE", images: 0 }), PricingError);
+    assert.throws(() => quoteCreditOrder(P, { kind: "IMAGE", images: 21 }), PricingError);
+    assert.throws(() => quoteCreditOrder(P, { kind: "IMAGE", images: 1.5 }), PricingError);
+    assert.throws(() => quoteCreditOrder(P, { kind: "VIDEO", seconds: 3 }), PricingError);
+    assert.throws(() => quoteCreditOrder(P, { kind: "VIDEO", seconds: 31 }), PricingError);
+  });
+
+  it("rounds a converted price up to the step, whatever the rate or margin", () => {
+    const rates = [1, 99.5, 129.99, 130, 131.01, 250, 1000];
+    const margins = [0, 0.05, 0.3, 1];
+    const steps = [10, 50, 100];
+    for (const usdToKes of rates) {
+      for (const margin of margins) {
+        for (const roundToKes of steps) {
+          for (const usd of [0.5, 3, 9, 23, 99.99]) {
+            const cents = kesCentsFromUsd(usd, { usdToKes, margin, roundToKes });
+            const exact = usd * usdToKes * (1 + margin);
+            assert.equal(cents % (roundToKes * 100), 0, "a multiple of the step");
+            assert.ok(cents / 100 >= exact - 1e-6, `never below the exact price (${usd} x ${usdToKes} x ${1 + margin})`);
+            assert.ok(cents / 100 < exact + roundToKes + 1e-6, "and never a whole step above it");
+          }
+        }
+      }
+    }
+  });
+
+  it("converts credits to shillings without ever undercharging a fraction of a shilling", () => {
+    for (const credits of [1, 2, 3, 22, 44, 66, 110, 599, 600, 1800]) {
+      const cents = creditsToCents(P, credits);
+      assert.equal(cents % 100, 0);
+      assert.ok(cents >= credits * P.creditValueCents - 1e-6);
+      assert.ok(cents - credits * P.creditValueCents < 100, "at most one shilling of rounding");
+    }
+  });
+});

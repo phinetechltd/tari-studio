@@ -134,3 +134,21 @@ The *Organisations* page shows a **Ready for customers?** card until each item i
 - Platform admin → Notifications → send a test email and SMS.
 - Social → Test connection on each channel.
 - Back up the database nightly (`pg_dump`) and the `STORAGE_DIR` folder, which holds generated media.
+
+## 12. Accounts, sign-in and recovery
+
+People create their own accounts at `/signup` and confirm their email with a 6-digit code or the emailed button before they can sign in. A new account has no team until it creates one (`/welcome`) or accepts an invitation. Passwords are recovered at `/forgot-password` by an emailed code or link, or by a text to a phone the person has confirmed in their profile. Codes live 15 minutes, allow five tries and work once; they are stored only as hashes.
+
+1. **Email is required for all of this.** Without live SMTP, nobody can sign up or recover a password (production refuses the console stand-in). Set it under *Platform admin → Settings → Email (SMTP)*, or in `.env`. For a Gmail sender: host `smtp.gmail.com`, port `465`, "TLS from the start" on, username the full Gmail address, **an app password** (Google Account → Security → 2-Step Verification → App passwords; never the normal password), From name `Tari Studio`, From address and reply-to the same Gmail address. The password is sealed at rest, shown only as `••••last4`, and must never be committed. If it was ever pasted into a chat or a ticket, create a new one and revoke the old.
+2. **SMS codes** use the same Bonga setup as notifications and reach Kenyan numbers only. They are rate-limited per person and per number, but each one costs money, so watch the Bonga balance and `SMS_DAILY_CAP` does **not** apply to codes.
+3. **Google sign-in** (optional): in Google Cloud Console create an OAuth client of type *Web application*, add the authorised redirect URI `https://your-domain/api/auth/google/callback`, then paste the client ID and secret into *Platform admin → Settings → Google sign-in*. The Google buttons on the sign-in and sign-up pages appear only once both are saved. A Google email that matches an existing account links to it; anyone with an authenticator app set up must still sign in with password and code.
+4. **Roles**: Owners manage members under *Team* (role, extra permissions, suspend, remove); every person sees all of their teams under *My teams* and can leave one. A team always keeps one active Owner.
+5. Legal pages `/privacy` and `/cookies` are drafts written for the Kenya Data Protection Act: have a lawyer review them before launch and keep them in step with what the platform really does.
+
+## 13. Operating notes
+
+- `GET /api/health` is public and reports only up/down, the database and the job queue. Send the header `x-health-token: <HEALTH_TOKEN>` (set `HEALTH_TOKEN`) to see which providers are live.
+- The server validates its configuration at start (`src/instrumentation.ts`); a bad `AUTH_SECRET` or `DATABASE_URL` stops the deploy instead of failing on the first request.
+- nginx: turn on `gzip on;` for text, JSON and SVG; serve `/_next/static/` with `Cache-Control: public, max-age=31536000, immutable` (Next sets it; do not strip it); allow `client_max_body_size 12m;` for image uploads; keep TLS and HSTS in the server block (certbot). The app sets its own security headers and a Content-Security-Policy.
+- Backups: `pg_dump` nightly and a copy of `STORAGE_DIR`; keep at least 14 days. To restore: stop the web and worker services, `createdb` a fresh database, `psql` the dump into it, restore `STORAGE_DIR`, run `npx prisma migrate deploy`, start the services, then check `/api/health`. Test a restore before you need one.
+- Logs go to the service output (`journalctl -u agency-web -u agency-worker`); rotate them with the journal's size limit (`SystemMaxUse=`).

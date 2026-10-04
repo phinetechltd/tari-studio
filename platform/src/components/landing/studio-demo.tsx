@@ -94,8 +94,8 @@ export function StudioDemo({ pricing }: { pricing: Pricing }) {
       className="rounded-3xl px-4 py-10 sm:px-8 sm:py-14"
       footer={
         live ? (
-          <p className="text-center text-sm text-white/60" aria-live="polite">
-            {describe(live.meta)}: {live.cost.credits} credits, <span className="font-medium text-white">{formatKES(live.cost.cents)}</span>
+          <p className="text-center text-sm text-ink/60" aria-live="polite">
+            {describe(live.meta)}: {live.cost.credits} credits, <span className="font-medium text-ink">{formatKES(live.cost.cents)}</span>
           </p>
         ) : null
       }
@@ -103,10 +103,10 @@ export function StudioDemo({ pricing }: { pricing: Pricing }) {
       <div className="space-y-5" aria-live="polite">
         {turns.map((t) => (
           <div key={t.id} className="space-y-3">
-            <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-wash/[0.08] px-4 py-3 text-sm text-white/90">
+            <div className="ml-auto max-w-[85%] rounded-2xl rounded-br-sm bg-wash/[0.08] px-4 py-3 text-sm text-ink/90">
               {t.user}
             </div>
-            <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-wash/[0.08] bg-wash/[0.03] p-4 text-sm text-white/80">
+            <div className="max-w-[92%] rounded-2xl rounded-bl-sm border border-wash/[0.08] bg-wash/[0.03] p-4 text-sm text-ink/80">
               {t.reply.kind === "text" ? (
                 <p>{t.reply.text}</p>
               ) : (
@@ -124,7 +124,7 @@ export function StudioDemo({ pricing }: { pricing: Pricing }) {
                     autoPlay
                     preload="metadata"
                   />
-                  <figcaption className="mt-2 text-xs text-white/50">{t.example.label}</figcaption>
+                  <figcaption className="mt-2 text-xs text-ink/50">{t.example.label}</figcaption>
                 </figure>
               )}
             </div>
@@ -140,14 +140,14 @@ function QuoteCard({ intent, pricing }: { intent: Intent; pricing: Pricing }) {
   const isVideo = intent.mode !== "image";
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-white/40">Quote</p>
-      <p className="mt-1 text-white/90">{describe(intent)}</p>
-      <p className="mt-1 text-white/60">&ldquo;{intent.prompt}&rdquo;</p>
+      <p className="text-xs uppercase tracking-wide text-ink/40">Quote</p>
+      <p className="mt-1 text-ink/90">{describe(intent)}</p>
+      <p className="mt-1 text-ink/60">&ldquo;{intent.prompt}&rdquo;</p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <span className="rounded-full bg-violet-500/20 px-3 py-1 text-xs text-violet-200">
+        <span className="rounded-full bg-primary/20 px-3 py-1 text-xs text-primary">
           {cost.credits} credits
         </span>
-        <span className="rounded-full bg-wash/[0.08] px-3 py-1 text-xs text-white">{formatKES(cost.cents)}</span>
+        <span className="rounded-full bg-wash/[0.08] px-3 py-1 text-xs text-ink">{formatKES(cost.cents)}</span>
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
@@ -161,13 +161,13 @@ function QuoteCard({ intent, pricing }: { intent: Intent; pricing: Pricing }) {
               aspectRatio: intent.aspectRatio,
             })
           }
-          className="min-h-[40px] rounded-lg bg-white px-4 text-sm font-medium text-neutral-950 hover:bg-wash/90"
+          className="min-h-[40px] rounded-lg bg-primary px-4 text-sm font-medium text-onprimary hover:bg-primary/90"
         >
           Order this {isVideo ? "video" : "image"}
         </button>
         <Link
           href="/login"
-          className="flex min-h-[40px] items-center rounded-lg border border-wash/15 px-4 text-sm text-white/80 hover:bg-wash/[0.06]"
+          className="flex min-h-[40px] items-center rounded-lg border border-wash/15 px-4 text-sm text-ink/80 hover:bg-wash/[0.06]"
         >
           Make it yourself in the Studio
         </Link>

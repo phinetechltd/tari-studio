@@ -42,3 +42,9 @@ export const PRODUCT_LOGO = {
   /** Stacked lock-up as supplied, navy wordmark */
   stacked: { src: "/brand/tari-studio-logo.png", width: 766, height: 889 },
 } as const;
+
+/** The company that operates the platform (shown in the footer and the legal pages). */
+export const OPERATOR_NAME = "PhineTech Ltd";
+export const OPERATOR_URL = "https://phinetech.co.ke/";
+/** Where people write for help and data requests. */
+export const SUPPORT_EMAIL = "phinetechltd@gmail.com";

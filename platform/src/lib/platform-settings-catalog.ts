@@ -9,7 +9,7 @@
  * two-factor authentication).
  */
 
-export type PlatformGroup = "ai" | "video" | "social" | "mpesa" | "paystack" | "email" | "sms";
+export type PlatformGroup = "ai" | "video" | "social" | "mpesa" | "paystack" | "email" | "sms" | "google";
 
 export interface PlatformSettingSpec {
   key: string;
@@ -29,6 +29,7 @@ export const PLATFORM_GROUPS: Array<{ id: PlatformGroup; name: string; summary: 
   { id: "mpesa", name: "M-Pesa (Daraja)", summary: "STK push for orders, plans and credit top-ups." },
   { id: "paystack", name: "Paystack", summary: "Cards, M-Pesa and Apple Pay on Paystack's checkout, and card renewals for plans." },
   { id: "email", name: "Email (SMTP)", summary: "Invitations, receipts and notification emails, sent through your SMTP account." },
+  { id: "google", name: "Google sign-in", summary: "Lets people sign in or sign up with their Google account. Create an OAuth client in Google Cloud and paste its id and secret here." },
   { id: "sms", name: "SMS (Bonga)", summary: "Urgent notifications by text: failed renewals, plans ending, empty wallets, AI credits." },
 ];
 
@@ -182,6 +183,18 @@ export const PLATFORM_SETTINGS: PlatformSettingSpec[] = [
   { key: "BONGA_SMS_API_SECRET", label: "API secret", group: "sms", secret: true },
   { key: "BONGA_SMS_SERVICE_ID", label: "Service ID", group: "sms", secret: false, help: "The sender ID service to send from." },
   { key: "BONGA_SMS_ENDPOINT", label: "Send endpoint", group: "sms", secret: false, placeholder: "http://167.172.14.50:4002/v1/send-sms", help: "Leave empty for Bonga's default." },
+  { key: "GOOGLE_CLIENT_ID", label: "OAuth client ID", group: "google", secret: false, placeholder: "123456789-abc.apps.googleusercontent.com", help: "Google Cloud Console → APIs & Services → Credentials → OAuth client (Web). Add the redirect URI shown on this page." },
+  { key: "GOOGLE_CLIENT_SECRET", label: "OAuth client secret", group: "google", secret: true },
+  {
+    key: "GOOGLE_AUTH_ENABLED",
+    label: "Show the Google button",
+    group: "google",
+    secret: false,
+    options: [
+      { value: "true", label: "Yes (when the keys are set)" },
+      { value: "false", label: "No, hide it" },
+    ],
+  },
   { key: "SMS_DAILY_CAP", label: "Daily SMS limit", group: "sms", secret: false, placeholder: "300", help: "Across the platform; texts beyond it are logged, not sent." },
 ];
 

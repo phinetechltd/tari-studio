@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
  *   - no module-level <style> injection (the keyframes live in globals.css);
  *   - no fake attachments or timers.
  *
- * It is always dark, in both themes: it is drawn as a showcase band.
+ * It follows the theme (dark or light) through the colour tokens.
  */
 
 interface UseAutoResizeTextareaProps {
@@ -242,17 +242,17 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
       ref={rootRef}
       onPointerMove={onPointerMove}
       className={cn(
-        "lab-bg relative flex w-full flex-col items-center overflow-hidden bg-neutral-950 text-white",
+        "lab-bg relative flex w-full flex-col items-center overflow-hidden bg-bg text-ink",
         className,
       )}
     >
       <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden>
-        <div className="absolute left-1/4 top-0 h-96 w-96 animate-pulse rounded-full bg-violet-500/10 blur-[128px]" />
-        <div className="absolute bottom-0 right-1/4 h-96 w-96 animate-pulse rounded-full bg-indigo-500/10 blur-[128px] [animation-delay:700ms]" />
-        <div className="absolute right-1/3 top-1/4 h-64 w-64 animate-pulse rounded-full bg-fuchsia-500/10 blur-[96px] [animation-delay:1000ms]" />
+        <div className="absolute left-1/4 top-0 h-96 w-96 animate-pulse rounded-full bg-primary/10 blur-[128px]" />
+        <div className="absolute bottom-0 right-1/4 h-96 w-96 animate-pulse rounded-full bg-warning/10 blur-[128px] [animation-delay:700ms]" />
+        <div className="absolute right-1/3 top-1/4 h-64 w-64 animate-pulse rounded-full bg-success/10 blur-[96px] [animation-delay:1000ms]" />
       </div>
 
-      <div className="relative z-10 mx-auto flex w-full max-w-3xl flex-col gap-6">
+      <div className="relative z-10 mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col gap-4">
         {(headline || subline) && (
           <motion.div
             className="space-y-3 text-center"
@@ -262,25 +262,25 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
           >
             {headline && (
               <div className="inline-block">
-                <h2 className="bg-gradient-to-r from-white/90 to-white/50 bg-clip-text pb-1 text-2xl font-medium tracking-tight text-transparent sm:text-3xl">
+                <h2 className="bg-gradient-to-r from-ink to-ink/60 bg-clip-text pb-1 text-2xl font-medium tracking-tight text-transparent sm:text-3xl">
                   {headline}
                 </h2>
                 <motion.div
-                  className="h-px bg-gradient-to-r from-transparent via-white/20 to-transparent"
+                  className="h-px bg-gradient-to-r from-transparent via-wash/20 to-transparent"
                   initial={reduceMotion ? false : { width: 0, opacity: 0 }}
                   animate={{ width: "100%", opacity: 1 }}
                   transition={{ delay: 0.4, duration: 0.8 }}
                 />
               </div>
             )}
-            {subline && <p className="text-sm text-white/50">{subline}</p>}
+            {subline && <p className="text-sm text-ink/50">{subline}</p>}
           </motion.div>
         )}
 
         {children}
 
         <motion.div
-          className="relative rounded-2xl border border-white/[0.08] bg-white/[0.03] shadow-2xl backdrop-blur-2xl"
+          className="relative rounded-2xl border border-wash/[0.08] bg-wash/[0.03] shadow-2xl backdrop-blur-2xl"
           initial={reduceMotion ? false : { scale: 0.98 }}
           animate={{ scale: 1 }}
           transition={{ delay: 0.1 }}
@@ -291,13 +291,13 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
                 ref={commandPaletteRef}
                 role="listbox"
                 aria-label="Commands"
-                className="absolute bottom-full left-4 right-4 z-50 mb-2 overflow-hidden rounded-lg border border-white/10 bg-black/90 shadow-lg backdrop-blur-xl"
+                className="absolute bottom-full left-4 right-4 z-50 mb-2 overflow-hidden rounded-lg border border-wash/10 bg-raised/95 shadow-lg backdrop-blur-xl"
                 initial={{ opacity: 0, y: 5 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 5 }}
                 transition={{ duration: 0.15 }}
               >
-                <div className="bg-black/95 py-1">
+                <div className="bg-raised/95 py-1">
                   {commands.map((suggestion, index) => (
                     <button
                       type="button"
@@ -306,14 +306,14 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
                       key={suggestion.prefix}
                       className={cn(
                         "flex w-full items-center gap-2 px-3 py-2 text-left text-xs transition-colors",
-                        activeSuggestion === index ? "bg-white/10 text-white" : "text-white/70 hover:bg-white/5",
+                        activeSuggestion === index ? "bg-wash/10 text-ink" : "text-ink/70 hover:bg-wash/5",
                       )}
                       onClick={() => selectCommand(index)}
                     >
-                      <span className="flex h-5 w-5 items-center justify-center text-white/60">{suggestion.icon}</span>
+                      <span className="flex h-5 w-5 items-center justify-center text-ink/60">{suggestion.icon}</span>
                       <span className="font-medium">{suggestion.label}</span>
-                      <span className="ml-1 text-white/40">{suggestion.prefix}</span>
-                      <span className="ml-auto hidden text-white/40 sm:inline">{suggestion.description}</span>
+                      <span className="ml-1 text-ink/40">{suggestion.prefix}</span>
+                      <span className="ml-auto hidden text-ink/40 sm:inline">{suggestion.description}</span>
                     </button>
                   ))}
                 </div>
@@ -339,14 +339,14 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
               placeholder={placeholder}
               disabled={disabled}
               className={cn(
-                "min-h-[60px] w-full resize-none border-none bg-transparent px-4 py-3 text-sm text-white/90",
-                "placeholder:text-white/30 focus:outline-none focus-visible:outline-none disabled:opacity-50",
+                "min-h-[60px] w-full resize-none border-none bg-transparent px-4 py-3 text-sm text-ink/90",
+                "placeholder:text-wash/30 focus:outline-none focus-visible:outline-none disabled:opacity-50",
               )}
               style={{ overflow: "hidden" }}
             />
           </div>
 
-          <div className="flex items-center justify-between gap-4 border-t border-white/[0.06] p-4">
+          <div className="flex items-center justify-between gap-4 border-t border-wash/[0.06] p-4">
             <div className="flex items-center gap-3">
               <motion.button
                 ref={commandButtonRef}
@@ -359,8 +359,8 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
                 }}
                 whileTap={{ scale: 0.94 }}
                 className={cn(
-                  "group relative rounded-lg p-2 text-white/50 transition-colors hover:text-white/90",
-                  showCommandPalette && "bg-white/10 text-white/90",
+                  "group relative rounded-lg p-2 text-ink/50 transition-colors hover:text-ink/90",
+                  showCommandPalette && "bg-wash/10 text-ink/90",
                 )}
               >
                 <Command className="h-4 w-4" />
@@ -368,7 +368,7 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
               <AnimatePresence>
                 {recentCommand && (
                   <motion.span
-                    className="text-xs text-white/50"
+                    className="text-xs text-ink/50"
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
@@ -388,8 +388,8 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
               className={cn(
                 "flex min-h-[40px] items-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all",
                 value.trim() && !busy
-                  ? "bg-white text-neutral-950 shadow-lg shadow-white/10"
-                  : "cursor-not-allowed bg-white/[0.06] text-white/40",
+                  ? "bg-primary text-onprimary shadow-lg shadow-primary/20"
+                  : "cursor-not-allowed bg-wash/[0.06] text-ink/40",
               )}
             >
               {sending || thinking ? (
@@ -411,7 +411,7 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
                 type="button"
                 key={suggestion.prefix}
                 onClick={() => selectCommand(index)}
-                className="relative flex min-h-[40px] items-center gap-2 rounded-lg border border-white/[0.06] bg-white/[0.03] px-3 py-2 text-sm text-white/60 transition-all hover:bg-white/[0.06] hover:text-white/90"
+                className="relative flex min-h-[40px] items-center gap-2 rounded-lg border border-wash/[0.06] bg-wash/[0.03] px-3 py-2 text-sm text-ink/60 transition-all hover:bg-wash/[0.06] hover:text-ink/90"
                 initial={reduceMotion ? false : { opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: index * 0.08 }}
@@ -428,16 +428,16 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
         {thinking && (
           <motion.div
             role="status"
-            className="relative z-10 mx-auto mt-4 rounded-full border border-white/[0.06] bg-white/[0.03] px-4 py-2 shadow-lg backdrop-blur-2xl"
+            className="relative z-10 mx-auto mt-4 rounded-full border border-wash/[0.06] bg-wash/[0.03] px-4 py-2 shadow-lg backdrop-blur-2xl"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 20 }}
           >
             <div className="flex items-center gap-3">
-              <div className="flex h-7 min-w-8 items-center justify-center rounded-full bg-white/[0.06] px-2 text-center">
-                <span className="text-xs font-medium text-white/90">{assistantName}</span>
+              <div className="flex h-7 min-w-8 items-center justify-center rounded-full bg-wash/[0.06] px-2 text-center">
+                <span className="text-xs font-medium text-ink/90">{assistantName}</span>
               </div>
-              <div className="flex items-center gap-2 text-sm text-white/70">
+              <div className="flex items-center gap-2 text-sm text-ink/70">
                 <span>{thinkingLabel}</span>
                 <TypingDots />
               </div>
@@ -449,7 +449,7 @@ export const AnimatedAIChat = forwardRef<AnimatedAIChatHandle, AnimatedAIChatPro
       {inputFocused && !reduceMotion && (
         <motion.div
           aria-hidden
-          className="motion-safe-only pointer-events-none absolute left-0 top-0 z-0 h-[40rem] w-[40rem] rounded-full bg-gradient-to-r from-violet-500 via-fuchsia-500 to-indigo-500 opacity-[0.03] blur-[96px]"
+          className="motion-safe-only pointer-events-none absolute left-0 top-0 z-0 h-[40rem] w-[40rem] rounded-full bg-gradient-to-r from-primary via-warning to-danger opacity-[0.03] blur-[96px]"
           animate={{ x: pointer.x - 320, y: pointer.y - 320 }}
           transition={{ type: "spring", damping: 25, stiffness: 150, mass: 0.5 }}
         />
@@ -464,11 +464,11 @@ export function TypingDots() {
       {[1, 2, 3].map((dot) => (
         <motion.div
           key={dot}
-          className="mx-0.5 h-1.5 w-1.5 rounded-full bg-white/90"
+          className="mx-0.5 h-1.5 w-1.5 rounded-full bg-wash/90"
           initial={{ opacity: 0.3 }}
           animate={{ opacity: [0.3, 0.9, 0.3], scale: [0.85, 1.1, 0.85] }}
           transition={{ duration: 1.2, repeat: Infinity, delay: dot * 0.15, ease: "easeInOut" }}
-          style={{ boxShadow: "0 0 4px rgba(255, 255, 255, 0.3)" }}
+          style={{ boxShadow: "0 0 4px rgb(var(--c-wash) / 0.3)" }}
         />
       ))}
     </div>

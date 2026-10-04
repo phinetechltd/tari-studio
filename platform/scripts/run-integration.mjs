@@ -48,6 +48,9 @@ const env = {
   CREDENTIALS_KEY: Buffer.alloc(32, 7).toString("base64"),
   ACCESS_TOKEN_TTL_MIN: "60",
   EMAIL_PROVIDER: "console",
+  SMS_PROVIDER: "console",
+  GOOGLE_CLIENT_ID: "",
+  GOOGLE_CLIENT_SECRET: "",
   META_PROVIDER: "simulator",
   AI_PROVIDER: "fixtures",
   // Prisma loads the developer's .env into process.env at runtime, so anything

@@ -110,6 +110,7 @@ export function StudioApp({
   useEffect(() => {
     if (running.length === 0) return;
     const t = setInterval(async () => {
+      if (document.hidden) return; // nobody is looking; catch up when the tab returns
       const updates = await Promise.all(running.map((id) => callApi<MessageView>(`/api/studio/messages/${id}`)));
       const byId = new Map(updates.filter((u) => u.data).map((u) => [u.data!.id, u.data!]));
       setDetail((d) => (d ? { ...d, messages: d.messages.map((m) => byId.get(m.id) ?? m) } : d));
@@ -251,11 +252,11 @@ export function StudioApp({
   }, [draft, pricing, models]);
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+    <div className="grid h-full min-h-0 gap-0 lg:grid-cols-[272px_minmax(0,1fr)]">
       {/* ── Projects ─────────────────────────────────────────── */}
       <aside
         id="studio-projects"
-        className={cn("card max-h-[80vh] flex-col overflow-hidden lg:sticky lg:top-6 lg:flex", projectsOpen ? "flex" : "hidden")}
+        className={cn("min-h-0 flex-col overflow-hidden border-line bg-surface lg:flex lg:border-r", projectsOpen ? "flex max-h-[70vh] border-b" : "hidden")}
         aria-label="Projects"
       >
         <div className="space-y-3 border-b border-line p-3">
@@ -320,7 +321,7 @@ export function StudioApp({
       </aside>
 
       {/* ── Chat ─────────────────────────────────────────────── */}
-      <section className="min-w-0 space-y-4">
+      <section className="flex min-h-0 min-w-0 flex-col gap-3 overflow-hidden px-3 py-3 sm:px-5">
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -408,7 +409,7 @@ export function StudioApp({
           disabled={detail?.thread.archived ?? false}
           placeholder={detail?.thread.archived ? "Restore this project to keep working" : "Describe a video, or type / for commands"}
           assistantName="Studio"
-          className="rounded-2xl px-3 py-6 sm:px-6"
+          className="min-h-0 flex-1 rounded-2xl border border-line px-3 py-4 sm:px-6"
           hideChips={messages.length > 0}
           footer={
             live ? (
@@ -418,7 +419,7 @@ export function StudioApp({
             ) : null
           }
         >
-          <div ref={listRef} className="max-h-[60vh] min-h-[240px] space-y-4 overflow-y-auto overscroll-contain pr-1" aria-live="polite">
+          <div ref={listRef} className="min-h-[200px] flex-1 space-y-4 overflow-y-auto overscroll-contain pr-1" aria-live="polite">
             {messages.length === 0 && (
               <div className="py-8 text-center">
                 <p className="text-lg text-ink/80">What are we making?</p>

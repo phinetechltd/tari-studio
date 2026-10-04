@@ -23,7 +23,7 @@ export interface WizardStep {
  * the rest are a checklist. Each step links to the real page; coming back
  * here shows it ticked, because "done" is read from what exists.
  */
-export function SetupWizard({ steps, canEdit, dismissed }: { steps: WizardStep[]; canEdit: boolean; dismissed: boolean }) {
+export function SetupWizard({ steps, canEdit, dismissed, guideOff }: { steps: WizardStep[]; canEdit: boolean; dismissed: boolean; guideOff: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -126,6 +126,17 @@ export function SetupWizard({ steps, canEdit, dismissed }: { steps: WizardStep[]
             </li>
           ))}
         </ol>
+        <button
+          type="button"
+          disabled={busy !== null}
+          onClick={async () => {
+            await patch({ guideOff: !guideOff }, "guide");
+            if (!guideOff) router.push("/app");
+          }}
+          className="mt-3 w-full rounded-full border border-line px-3 py-2 text-sm text-ink hover:bg-wash/[0.08]"
+        >
+          {guideOff ? "Turn the setup guide back on" : "Skip setup and don't show this again"}
+        </button>
         {canEdit ? (
           <button
             type="button"

@@ -39,7 +39,9 @@ export function MediaLibrary({ initial }: { initial: AssetView[] }) {
   // Keep running generations fresh.
   useEffect(() => {
     if (!items.some((a) => a.status === "GENERATING")) return;
-    const t = setInterval(() => void load(filter, q.trim()), 8000);
+    const t = setInterval(() => {
+      if (!document.hidden) void load(filter, q.trim());
+    }, 8000);
     return () => clearInterval(t);
   }, [items, filter, q, load]);
 

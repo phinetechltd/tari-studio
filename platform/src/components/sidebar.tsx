@@ -59,6 +59,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   brands: Layers,
   catalogue: Package,
   templates: LayoutTemplate,
+  teams: UsersRound,
   characters: UserRound,
   orders: Receipt,
   tasks: ListChecks,
@@ -104,6 +105,9 @@ export function ConsoleFrame(props: SidebarProps & { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const pathname = usePathname();
+  // The Studio fills the screen with the side menu folded away. Opening the menu there is a visit, not a saved choice.
+  const immersive = pathname === "/content";
+  const [openHere, setOpenHere] = useState(false);
 
   useEffect(() => {
     try {
@@ -113,7 +117,10 @@ export function ConsoleFrame(props: SidebarProps & { children: ReactNode }) {
     }
   }, []);
 
-  useEffect(() => setDrawerOpen(false), [pathname]);
+  useEffect(() => {
+    setDrawerOpen(false);
+    setOpenHere(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!drawerOpen) return;
@@ -127,7 +134,12 @@ export function ConsoleFrame(props: SidebarProps & { children: ReactNode }) {
     };
   }, [drawerOpen]);
 
-  const toggleCollapsed = () =>
+  const railCollapsed = immersive ? !openHere : collapsed;
+  const toggleCollapsed = () => {
+    if (immersive) {
+      setOpenHere((o) => !o);
+      return;
+    }
     setCollapsed((c) => {
       try {
         window.localStorage.setItem(COLLAPSED_KEY, c ? "0" : "1");
@@ -136,9 +148,10 @@ export function ConsoleFrame(props: SidebarProps & { children: ReactNode }) {
       }
       return !c;
     });
+  };
 
   const current = props.items.find((i) => i.href === activeHref(props.items, pathname));
-  const railWidth = collapsed ? "lg:pl-[76px]" : "lg:pl-[232px]";
+  const railWidth = railCollapsed ? "lg:pl-[76px]" : "lg:pl-[232px]";
 
   return (
     <div className="min-h-screen bg-surface">
@@ -153,7 +166,7 @@ export function ConsoleFrame(props: SidebarProps & { children: ReactNode }) {
 
       <Rail
         {...props}
-        collapsed={collapsed}
+        collapsed={railCollapsed}
         drawerOpen={drawerOpen}
         onToggleCollapsed={toggleCollapsed}
         onCloseDrawer={() => setDrawerOpen(false)}
@@ -191,7 +204,11 @@ export function ConsoleFrame(props: SidebarProps & { children: ReactNode }) {
       </header>
 
       <main className={cn("transition-[padding] duration-200", railWidth)}>
-        <div className="mx-auto max-w-[1320px] px-4 pb-28 pt-4 sm:px-6 lg:pt-6">{props.children}</div>
+        {immersive ? (
+          <div className="h-[calc(100dvh-60px)] min-h-[420px] w-full overflow-hidden">{props.children}</div>
+        ) : (
+          <div className="mx-auto max-w-[1320px] px-4 pb-28 pt-4 sm:px-6 lg:pt-6">{props.children}</div>
+        )}
       </main>
     </div>
   );

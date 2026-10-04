@@ -22,6 +22,17 @@ const PUBLIC_ALLOWLIST = new Set([
   "api/auth/login",
   "api/auth/logout",
   "api/auth/accept-invite",
+  // Self-service sign-up and recovery. Each is rate-limited per identity, answers the same whether or not the
+  // address has an account, and works only with a single-use code or link (src/server/accounts.ts).
+  "api/auth/register",
+  "api/auth/verify",
+  "api/auth/resend",
+  "api/auth/forgot",
+  "api/auth/reset",
+  "api/auth/code",
+  // Google sign-in: state, nonce and PKCE are checked on return (src/server/oauth-google.ts).
+  "api/auth/google/start",
+  "api/auth/google/callback",
   "api/auth/invite",
   "api/health",
   // Public ordering from the landing page. Guarded by rate limits per phone,
@@ -85,7 +96,7 @@ for (const file of walk(appDir, "route.ts")) {
     routeCount++;
     const body = call[1];
     const isPublic = /public:\s*true/.test(body);
-    const declared = isPublic || /permission:\s*"/.test(body) || /authOnly:\s*true/.test(body);
+    const declared = isPublic || /permission:\s*"/.test(body) || /authOnly:\s*true/.test(body) || /account:\s*true/.test(body);
     if (!declared) problems.push(`${rel(file)}: handler options must declare permission, authOnly or public`);
     if (isPublic && !PUBLIC_ALLOWLIST.has(routePath)) {
       problems.push(`${rel(file)}: public route "${routePath}" is not on the reviewed allow-list in check-permissions.mjs`);
@@ -99,7 +110,7 @@ for (const file of walk(appDir, "route.ts")) {
 for (const file of walk(consoleDir, "page.tsx")) {
   pageCount++;
   const text = fs.readFileSync(file, "utf8");
-  if (!/\brequire(Session|Tenant|Platform|Permission)\s*\(/.test(text)) {
+  if (!/\brequire(Session|Tenant|Platform|Permission|Account)\s*\(/.test(text)) {
     problems.push(`${rel(file)}: console page does not call a session guard itself`);
   }
 }

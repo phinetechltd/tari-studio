@@ -1,8 +1,9 @@
 import { Menu } from "lucide-react";
+import Image from "next/image";
 import Link from "next/link";
 
 import { BrandLogo } from "@/components/brand-logo";
-import { PRODUCT_NAME, PRODUCT_TAGLINE } from "@/lib/brand";
+import { OPERATOR_NAME, OPERATOR_URL, PRODUCT_NAME, PRODUCT_TAGLINE, SUPPORT_EMAIL } from "@/lib/brand";
 
 const LINKS = [
   { href: "/#tools", label: "Tools" },
@@ -33,8 +34,8 @@ export function SiteHeader() {
           <Link href="/login" className="hidden rounded-full px-3 py-2 text-sm text-ink/80 hover:text-ink sm:block">
             Sign in
           </Link>
-          <Link href="/pricing" className="btn-primary min-h-[38px] px-4 text-sm">
-            Start creating
+          <Link href="/signup" className="btn-primary min-h-[38px] px-4 text-sm">
+            Get started
           </Link>
           <details className="relative lg:hidden">
             <summary className="flex h-10 w-10 cursor-pointer list-none items-center justify-center rounded-full text-ink hover:bg-wash/[0.06] [&::-webkit-details-marker]:hidden" aria-label="Menu">
@@ -73,11 +74,39 @@ export function SiteFooter() {
         </div>
         <FooterCol title="Create" links={[{ href: "/#tools", label: "Video ads" }, { href: "/#tools", label: "Image ads" }, { href: "/#studio", label: "The Studio" }, { href: "/#order", label: "Done for you" }]} />
         <FooterCol title="Grow" links={[{ href: "/#tools", label: "WhatsApp auto-replies" }, { href: "/#tools", label: "Tracked links" }, { href: "/#tools", label: "Facebook & Instagram" }]} />
-        <FooterCol title="Company" links={[{ href: "/pricing", label: "Pricing" }, { href: "/login", label: "Sign in" }, { href: "/#faq", label: "Questions" }]} />
+        <FooterCol
+          title="Company"
+          links={[
+            { href: "/pricing", label: "Pricing" },
+            { href: "/login", label: "Sign in" },
+            { href: "/signup", label: "Create an account" },
+            { href: "/#faq", label: "Questions" },
+            { href: "/privacy", label: "Privacy policy" },
+            { href: "/cookies", label: "Cookie policy" },
+          ]}
+        />
       </div>
-      <p className="mx-auto mt-12 max-w-[1400px] text-xs text-muted">
-        &copy; {new Date().getFullYear()} {PRODUCT_NAME}. Prices in Kenyan shillings. Stock sample clips from Pexels are labelled as such.
-      </p>
+      <div className="mx-auto mt-12 flex max-w-[1400px] flex-col gap-6 border-t border-line pt-8 md:flex-row md:items-center md:justify-between">
+        <p className="max-w-xl text-xs text-muted">
+          &copy; {new Date().getFullYear()} {PRODUCT_NAME}. Prices in Kenyan shillings. Stock sample clips from Pexels are labelled as such. Support:{" "}
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-primary hover:underline">
+            {SUPPORT_EMAIL}
+          </a>
+        </p>
+        <a
+          href={OPERATOR_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="group inline-flex items-center gap-3 text-xs text-muted hover:text-ink"
+          aria-label={`${PRODUCT_NAME} is managed by ${OPERATOR_NAME} (opens phinetech.co.ke)`}
+        >
+          <span>Managed by</span>
+          {/* The wordmark is navy on transparent, so it sits on a cream plate to stay readable in both themes. */}
+          <span className="rounded-lg bg-[#fbf3e4] px-3 py-1.5 shadow-sm transition-transform group-hover:-translate-y-0.5">
+            <Image src="/brand/phinetech-wordmark.png" alt={OPERATOR_NAME} width={120} height={40} className="h-7 w-auto" />
+          </span>
+        </a>
+      </div>
     </footer>
   );
 }

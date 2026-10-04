@@ -3,7 +3,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import { ZodError, type z, type ZodTypeAny } from "zod";
 
-import { getPrincipal } from "./auth";
+import { accountFromClaims, getPrincipal, readSessionClaims, type AccountSession } from "./auth";
 import { LimitReachedError } from "./limits";
 import { MODULE_CATALOG, type ModuleKey } from "./modules";
 import { refreshPlatformConfig } from "./platform-config";
@@ -67,6 +67,8 @@ export interface HandlerContext<P = Record<string, string>> {
   request: Request;
   params: P;
   searchParams: URLSearchParams;
+  /** Set only on `account: true` routes */
+  account?: AccountSession;
 }
 
 export interface HandlerOptions {
@@ -83,6 +85,12 @@ export interface HandlerOptions {
   module?: ModuleKey;
   /** Allow a principal with no organisation (platform mode). Default false. */
   allowPlatform?: boolean;
+  /**
+   * Any signed-in, verified person, even one who is not in a team yet (create a
+   * team, list teams, switch teams, their own password and phone). The handler
+   * gets `account`, not a principal, so it cannot act inside a team by accident.
+   */
+  account?: boolean;
   /** Skip auth entirely — only for sign-in, health and public redirects. */
   public?: boolean;
 }
@@ -129,6 +137,14 @@ export function handler<P extends Record<string, string> = Record<string, string
           params,
           searchParams,
         });
+        return result instanceof NextResponse ? result : ok(result);
+      }
+
+      if (options.account) {
+        const claims = await readSessionClaims();
+        const account = claims ? await accountFromClaims(claims) : null;
+        if (!account) return fail(401, "UNAUTHENTICATED", "Sign in to continue.");
+        const result = await fn({ principal: undefined as unknown as Principal, request, params, searchParams, account });
         return result instanceof NextResponse ? result : ok(result);
       }
 

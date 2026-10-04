@@ -2,7 +2,7 @@ import "server-only";
 
 import { redirect } from "next/navigation";
 
-import { getSessionPrincipal, readSessionClaims, type SessionClaims } from "./auth";
+import { accountFromClaims, getSessionPrincipal, readSessionClaims, type AccountSession, type SessionClaims } from "./auth";
 import { refreshPlatformConfig } from "./platform-config";
 import type { Permission, Principal } from "./rbac";
 import { can } from "./rbac";
@@ -22,8 +22,22 @@ export interface ConsoleSession {
 
 export async function requireSession(): Promise<ConsoleSession> {
   const [principal, claims] = await Promise.all([getSessionPrincipal(), readSessionClaims(), refreshPlatformConfig()]);
-  if (!principal || !claims) redirect("/login");
+  if (!claims) redirect("/login");
+  if (!principal) {
+    // Signed in, but not inside a team (new account, or removed from the team): the welcome screen handles it.
+    const account = await accountFromClaims(claims);
+    redirect(account ? "/welcome" : "/login");
+  }
   return { principal, claims };
+}
+
+/** Pages for a signed-in person who may not be in a team yet (the welcome screen, account setup). */
+export async function requireAccount(): Promise<AccountSession> {
+  const claims = await readSessionClaims();
+  if (!claims) redirect("/login");
+  const account = await accountFromClaims(claims);
+  if (!account) redirect("/login");
+  return account;
 }
 
 /** Platform admins in platform mode only. */

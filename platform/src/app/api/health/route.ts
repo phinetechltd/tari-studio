@@ -12,7 +12,10 @@ export const dynamic = "force-dynamic";
 // minutes means the worker is down, which silently stops publishing, automations
 // and generations, so that is reported too. Nothing here names a customer or a
 // secret.
-export const GET = handler({ public: true }, async () => {
+export const GET = handler({ public: true }, async ({ request }) => {
+  // Which providers are live is useful to operators and to nobody else: it needs the monitoring token.
+  const token = process.env.HEALTH_TOKEN;
+  const trusted = Boolean(token) && request.headers.get("x-health-token") === token;
   let dbOk = false;
   let overdueJobs: number | null = null;
   let deadJobs: number | null = null;
@@ -36,12 +39,16 @@ export const GET = handler({ public: true }, async () => {
       time: new Date().toISOString(),
       db: dbOk,
       worker: { ok: workerOk, overdueJobs, deadJobsLast24h: deadJobs },
-      providers: {
-        ai: process.env.AI_PROVIDER ?? "fixtures",
-        meta: process.env.META_PROVIDER ?? "simulator",
-        payments: process.env.PAYMENT_PROVIDER ?? "simulator",
-        generation: process.env.GENERATION_PROVIDER ?? "simulator",
-      },
+      ...(trusted
+        ? {
+            providers: {
+              ai: process.env.AI_PROVIDER ?? "fixtures",
+              meta: process.env.META_PROVIDER ?? "simulator",
+              payments: process.env.PAYMENT_PROVIDER ?? "simulator",
+              generation: process.env.GENERATION_PROVIDER ?? "simulator",
+            },
+          }
+        : {}),
     },
     { status: dbOk ? 200 : 503, headers: { "Cache-Control": "no-store" } },
   );

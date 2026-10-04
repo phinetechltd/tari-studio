@@ -30,7 +30,14 @@ export async function updateProfile(userId: string, organizationId: string | nul
       data.phone = msisdn;
     }
   }
-  const user = await db.user.update({ where: { id: userId }, data, select: { name: true, phone: true } });
+  // A changed or removed number is no longer proven: it must be confirmed again before it can receive recovery codes.
+  const before = input.phone !== undefined ? await db.user.findUnique({ where: { id: userId }, select: { phone: true } }) : null;
+  const phoneChanged = input.phone !== undefined && (before?.phone ?? null) !== (data.phone ?? null);
+  const user = await db.user.update({
+    where: { id: userId },
+    data: { ...data, ...(phoneChanged ? { phoneVerifiedAt: null } : {}) },
+    select: { name: true, phone: true },
+  });
   await audit({
     organizationId,
     userId,

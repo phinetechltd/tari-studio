@@ -3,6 +3,7 @@ import "server-only";
 import bcrypt from "bcryptjs";
 import { SignJWT, jwtVerify } from "jose";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { audit } from "./audit";
 import { db } from "./db";
@@ -294,10 +295,20 @@ function parseExtraPermissions(raw: unknown): Permission[] {
  * Returns null for anything that should no longer have access.
  */
 export async function principalFromClaims(claims: SessionClaims): Promise<Principal | null> {
-  const user = await db.user.findUnique({
-    where: { id: claims.sub },
-    select: { id: true, status: true, tokenVersion: true, isPlatformAdmin: true, totpEnabledAt: true },
-  });
+  // The three lookups do not depend on each other, so they run together.
+  const [user, membership, licences] = await Promise.all([
+    db.user.findUnique({
+      where: { id: claims.sub },
+      select: { id: true, status: true, tokenVersion: true, isPlatformAdmin: true, totpEnabledAt: true },
+    }),
+    claims.org
+      ? db.membership.findUnique({
+          where: { userId_organizationId: { userId: claims.sub, organizationId: claims.org } },
+          select: { role: true, status: true, extraPermissions: true, organization: { select: { status: true } } },
+        })
+      : null,
+    claims.org ? db.organizationModule.findMany({ where: { organizationId: claims.org, enabled: true }, select: { moduleKey: true } }) : [],
+  ]);
   if (!user || user.status !== "ACTIVE" || user.tokenVersion !== claims.tv) return null;
 
   // REQUIRE_TOTP=false switches the second factor off for local and demo use,
@@ -318,20 +329,11 @@ export async function principalFromClaims(claims: SessionClaims): Promise<Princi
     };
   }
 
-  const membership = await db.membership.findUnique({
-    where: { userId_organizationId: { userId: user.id, organizationId: claims.org } },
-    select: { role: true, status: true, extraPermissions: true, organization: { select: { status: true } } },
-  });
   if (!membership || membership.status !== "ACTIVE" || membership.organization.status !== "ACTIVE") {
     return null;
   }
   // A corrupt or hand-edited role must never resolve to something powerful.
   if (!ORG_ROLES.has(membership.role)) return null;
-
-  const licences = await db.organizationModule.findMany({
-    where: { organizationId: claims.org, enabled: true },
-    select: { moduleKey: true },
-  });
 
   return {
     userId: user.id,
@@ -343,11 +345,64 @@ export async function principalFromClaims(claims: SessionClaims): Promise<Princi
   };
 }
 
+/**
+ * Someone who is signed in but may not be inside a team (just signed up, or
+ * removed from the team they were working in). They can reach the welcome
+ * screen, create a team or pick one, and nothing else.
+ */
+export interface AccountSession {
+  userId: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  isPlatformAdmin: boolean;
+  hasPassword: boolean;
+  phone: string | null;
+  phoneVerified: boolean;
+}
+
+export async function accountFromClaims(claims: SessionClaims): Promise<AccountSession | null> {
+  const user = await db.user.findUnique({
+    where: { id: claims.sub },
+    select: { id: true, name: true, email: true, status: true, tokenVersion: true, emailVerifiedAt: true, isPlatformAdmin: true, hasPassword: true, phone: true, phoneVerifiedAt: true },
+  });
+  if (!user || user.status !== "ACTIVE" || user.tokenVersion !== claims.tv) return null;
+  return {
+    userId: user.id,
+    name: user.name,
+    email: user.email,
+    emailVerified: user.emailVerifiedAt != null,
+    isPlatformAdmin: user.isPlatformAdmin,
+    hasPassword: user.hasPassword,
+    phone: user.phone,
+    phoneVerified: user.phoneVerifiedAt != null,
+  };
+}
+
+export const getAccountSession = cache(async (): Promise<AccountSession | null> => {
+  const claims = await readSessionClaims();
+  return claims ? accountFromClaims(claims) : null;
+});
+
+/** Opens a session for a verified person in the team they used last (or none yet). Returns where to go next. */
+export async function startSession(user: {
+  id: string;
+  name: string;
+  email: string;
+  tokenVersion: number;
+  activeOrganizationId: string | null;
+  isPlatformAdmin: boolean;
+}): Promise<{ org: string | null; next: string }> {
+  const org = await organisationForLogin(user);
+  await setSessionCookie(claimsFor(user, org));
+  return { org, next: org === null ? (user.isPlatformAdmin ? "/platform" : "/welcome") : "/app" };
+}
+
 /** Console-side principal, resolved from the session cookie. */
-export async function getSessionPrincipal(): Promise<Principal | null> {
+export const getSessionPrincipal = cache(async (): Promise<Principal | null> => {
   const claims = await readSessionClaims();
   return claims ? principalFromClaims(claims) : null;
-}
+});
 
 export async function getPrincipal(): Promise<Principal | null> {
   return getSessionPrincipal();

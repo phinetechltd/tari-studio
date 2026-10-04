@@ -137,7 +137,7 @@ export function PreferencesForm({ events, hasPhone, smsOn }: { events: PrefEvent
                         <td key={c} className="px-4 py-2.5 text-center">
                           <input
                             type="checkbox"
-                            className="h-4 w-4 accent-violet-500"
+                            className="h-4 w-4 accent-primary"
                             aria-label={`${e.label} by ${c === "EMAIL" ? "email" : "SMS"}`}
                             checked={state[e.key]![c]}
                             disabled={ch.locked || busy}

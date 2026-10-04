@@ -6,6 +6,9 @@ import { db } from "@/lib/db";
 import { ROLE_LABELS, can, type Role } from "@/lib/rbac";
 import { requirePermission } from "@/lib/session";
 
+import { ROLE_INFO } from "@/lib/role-info";
+
+import { MemberControls } from "./member-controls";
 import { InviteForm, RevokeInviteButton } from "./team-controls";
 
 export const metadata: Metadata = { title: "Team" };
@@ -24,6 +27,8 @@ export default async function TeamPage() {
         id: true,
         role: true,
         status: true,
+        extraPermissions: true,
+        userId: true,
         user: { select: { name: true, email: true, totpEnabledAt: true, lastLoginAt: true } },
       },
     }),
@@ -41,6 +46,18 @@ export default async function TeamPage() {
         Owners handle billing and settings, brand managers approve, marketers create and post. Invites arrive by email.
       </Hint>
 
+      <section aria-labelledby="roles" className="card mb-8 p-5">
+        <h2 id="roles" className="mb-3 text-lg font-medium">What each role can do</h2>
+        <dl className="grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
+          {(Object.keys(ROLE_INFO) as Array<keyof typeof ROLE_INFO>).map((r) => (
+            <div key={r}>
+              <dt className="font-medium text-ink">{ROLE_LABELS[r]}</dt>
+              <dd className="text-muted">{ROLE_INFO[r].summary}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
       <section aria-labelledby="members" className="mb-8">
         <h2 id="members" className="mb-3 text-lg font-medium">
           Members ({members.length})
@@ -53,6 +70,7 @@ export default async function TeamPage() {
                 <th className="px-4 py-2 font-medium">Role</th>
                 <th className="px-4 py-2 font-medium">Two-factor</th>
                 <th className="px-4 py-2 font-medium">Last sign-in</th>
+                {canInvite ? <th className="px-4 py-2 font-medium">Manage</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -68,6 +86,19 @@ export default async function TeamPage() {
                   </td>
                   <td className="px-4 py-2">{m.user.totpEnabledAt ? <Badge tone="success">On</Badge> : <Badge>Off</Badge>}</td>
                   <td className="px-4 py-2 text-muted">{m.user.lastLoginAt ? dateFmt.format(m.user.lastLoginAt) : "Never"}</td>
+                  {canInvite ? (
+                    <td className="px-4 py-2">
+                      <MemberControls
+                        id={m.id}
+                        name={m.user.name}
+                        role={m.role}
+                        suspended={m.status !== "ACTIVE"}
+                        extra={Array.isArray(m.extraPermissions) ? (m.extraPermissions as string[]) : []}
+                        isSelf={m.userId === principal.userId}
+                        viewerIsOwner={principal.role === "OWNER" || principal.role === "SUPER_ADMIN"}
+                      />
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

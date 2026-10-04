@@ -89,6 +89,7 @@ export function PayPanel({
   useEffect(() => {
     if (!stk || stk.phase !== "PROCESSING") return;
     const t = setInterval(async () => {
+      if (document.hidden) return;
       const r = await callApi<PollResult>(`/api/billing/payments/${stk.intentId}`);
       if (!r.data) return;
       const phase: StkPhase = r.data.status === "SUCCEEDED" ? "SUCCEEDED" : r.data.status === "FAILED" ? "FAILED" : "PROCESSING";
