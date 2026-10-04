@@ -22,8 +22,9 @@ export function LoginForm({ next }: { next?: string | null }) {
   function arrive(dest: string) {
     // The server may send the person somewhere first (the welcome screen); otherwise honour ?next.
     const back = safeNext(next);
-    router.push(back && dest === "/app" ? back : dest);
-    router.refresh();
+    // A full navigation, not router.push + refresh: the two raced (the refresh re-rendered /login
+    // while the push was still compiling the next page) and left people looking at the form.
+    window.location.assign(back && dest === "/app" ? back : dest);
   }
 
   async function submit(e: FormEvent<HTMLFormElement>) {
@@ -34,8 +35,8 @@ export function LoginForm({ next }: { next?: string | null }) {
     const body: Record<string, string> = { email: v.email, password: v.password };
     if (v.totp) body.totp = v.totp;
     const res = await callApi<{ next: string }>("/api/auth/login", "POST", body);
+    if (res.ok) return arrive(res.data!.next); // stay "Signing in…" until the page changes
     setPending(false);
-    if (res.ok) return arrive(res.data!.next);
     if (res.error?.code === "TOTP_REQUIRED") return setShowTotp(true);
     if (res.error?.code === "EMAIL_UNVERIFIED") return router.push(`/verify?email=${encodeURIComponent(v.email ?? "")}`);
     setError(res.error?.message ?? "Could not sign in.");
@@ -57,8 +58,8 @@ export function LoginForm({ next }: { next?: string | null }) {
     setError(null);
     const code = String(new FormData(e.currentTarget).get("code") ?? "").replace(/\s/g, "");
     const res = await callApi<{ next: string }>("/api/auth/code", "PUT", { identifier, code });
-    setPending(false);
     if (res.ok) return arrive(res.data!.next);
+    setPending(false);
     setError(res.error?.message ?? "That code did not work.");
   }
 
@@ -91,7 +92,7 @@ export function LoginForm({ next }: { next?: string | null }) {
       </div>
 
       {mode === "password" ? (
-        <form onSubmit={submit} className="space-y-4">
+        <form method="post" onSubmit={submit} className="space-y-4">
           <div>
             <label htmlFor="email" className="label">Email</label>
             <input id="email" name="email" type="email" required autoComplete="username" inputMode="email" className="input" value={email} onChange={(e) => setEmail(e.target.value)} />

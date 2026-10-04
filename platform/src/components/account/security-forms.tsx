@@ -35,7 +35,7 @@ export function PasswordForm({ hasPassword }: { hasPassword: boolean }) {
     } else setMsg({ tone: "error", text: res.error?.message ?? "Could not change the password." });
   }
   return (
-    <form onSubmit={submit} className="card max-w-xl space-y-4 p-5">
+    <form method="post" onSubmit={submit} className="card max-w-xl space-y-4 p-5">
       {hasPassword ? (
         <PasswordField id="current" name="current" label="Current password" autoComplete="current-password" />
       ) : (

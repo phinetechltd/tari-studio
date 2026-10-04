@@ -102,7 +102,7 @@ export function JsonForm<T = unknown>(props: {
   }
 
   return (
-    <form onSubmit={submit} className="space-y-4" noValidate={false}>
+    <form method="post" onSubmit={submit} className="space-y-4" noValidate={false}>
       {props.fields.map((f) => {
         const id = `${formId}-${f.name}`;
         return (

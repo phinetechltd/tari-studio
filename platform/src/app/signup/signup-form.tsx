@@ -40,7 +40,7 @@ export function SignupForm() {
   const fe = (k: string) => (fields[k] ? <p className="mt-1 text-xs text-danger" role="alert">{fields[k]}</p> : null);
 
   return (
-    <form onSubmit={submit} className="space-y-4" noValidate>
+    <form method="post" onSubmit={submit} className="space-y-4" noValidate>
       <div>
         <label htmlFor="name" className="label">Your name</label>
         <input id="name" name="name" required autoComplete="name" className="input" />
