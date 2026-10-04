@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx --tsconfig scripts/tsconfig.json prisma/seed.ts",
+    "admin:create": "tsx --tsconfig scripts/tsconfig.json scripts/create-admin.ts",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "test:unit": "tsx --tsconfig scripts/tsconfig.json --test \"src/**/*.test.ts\"",

@@ -50,6 +50,8 @@ npm run check:providers
 
 `check:providers` makes one cheap live call to each configured provider (an AI reply, a Meta app token, a Daraja OAuth token, a Paystack transaction list) and exits non-zero if any fails. Never run `prisma migrate reset` or `npm run db:seed` against production.
 
+**First platform admin**: on the server, as the app's user and from the app directory, run `npm run admin:create`. It asks for the email, name and password at the terminal (the password is not echoed and stays out of shell history); run it again with an existing address to make that account an admin or change its password. Then sign in and turn on two-factor sign-in under *Security*: admin settings need it.
+
 ## 4. Services (systemd)
 
 `/etc/systemd/system/agency-web.service`:
