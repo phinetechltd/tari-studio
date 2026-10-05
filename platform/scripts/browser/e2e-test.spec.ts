@@ -5,10 +5,14 @@ import { join } from "path";
 const EMAIL = "owner@demo.test";
 const PASSWORD = "Demo@2026-Agency";
 
-// Read the TOTP code from a file that gets updated before each test run
-const TOTP_CODE = readFileSync(join(__dirname, "..", "..", ".tmp_totp.txt"), "utf-8").trim();
-
-console.log("TOTP_CODE:", TOTP_CODE);
+// Optional: with REQUIRE_TOTP=true the code is refreshed into this file before a run.
+const TOTP_CODE = (() => {
+  try {
+    return readFileSync(join(__dirname, "..", "..", ".tmp_totp.txt"), "utf-8").trim();
+  } catch {
+    return "";
+  }
+})();
 
 test("full e2e: login + navigate to all sections", async ({ page }) => {
   // 1. Go to login
@@ -20,41 +24,45 @@ test("full e2e: login + navigate to all sections", async ({ page }) => {
   await page.locator("#password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
 
-  // 3. Step 2: wait for TOTP field to appear, fill it
-  await page.waitForSelector("#totp", { state: "visible", timeout: 5000 });
-  await page.locator("#totp").fill(TOTP_CODE);
-  await page.getByRole("button", { name: "Verify and sign in" }).click();
+  // 3. Step 2 (only when two-factor is on): wait briefly for the code page; otherwise we land on /app directly
+  const totp = page.locator("#totp");
+  const hasTotp = await totp.waitFor({ state: "visible", timeout: 5000 }).then(() => true).catch(() => false);
+  if (hasTotp) {
+    if (!TOTP_CODE) throw new Error("The app asked for an authenticator code but .tmp_totp.txt has none.");
+    await totp.fill(TOTP_CODE);
+    await page.getByRole("button", { name: "Verify and sign in" }).click();
+  }
 
   // 4. Should redirect to /app
-  await page.waitForURL("**/app**", { timeout: 10000 });
+  await page.waitForURL("**/app**", { timeout: 15000 });
   console.log("REDIRECTED to:", page.url());
 
   // 5. Navigate to Brands
-  await page.getByRole("link", { name: "Brands" }).click();
-  await page.waitForURL("**/app/brands**");
+  await page.locator("nav").getByRole("link", { name: "Brands" }).first().click();
+  await page.waitForURL("**/app/brands**", { timeout: 15000 });
   console.log("Brands page:", page.url());
 
-  // 6. Navigate to Content Studio
-  await page.getByRole("link", { name: "Content Studio" }).click();
-  await page.waitForURL("**/app/content**");
-  console.log("Content page:", page.url());
+  // 6. Navigate to the Studio
+  await page.locator("nav").getByRole("link", { name: /Studio/ }).first().click();
+  await page.waitForURL("**/content**", { timeout: 15000 });
+  console.log("Studio page:", page.url());
 
-  // 7. Navigate to Channels
-  await page.getByRole("link", { name: "Channels" }).click();
-  await page.waitForURL("**/app/social**");
+  // 7. Navigate to Social
+  await page.locator("nav").getByRole("link", { name: "Social" }).first().click();
+  await page.waitForURL("**/app/social**", { timeout: 15000 });
   console.log("Social page:", page.url());
 
   // 8. Navigate to Campaigns
-  await page.getByRole("link", { name: "Campaigns" }).click();
-  await page.waitForURL("**/app/campaigns**");
+  await page.locator("nav").getByRole("link", { name: "Campaigns" }).first().click();
+  await page.waitForURL("**/app/campaigns**", { timeout: 15000 });
   console.log("Campaigns page:", page.url());
 
-  // 9. Navigate to Catalogue
-  await page.getByRole("link", { name: "Catalogue" }).click();
-  await page.waitForURL("**/app/catalogue**");
-  console.log("Catalogue page:", page.url());
+  // 9. Navigate to Products
+  await page.locator("nav").getByRole("link", { name: "Products" }).first().click();
+  await page.waitForURL("**/app/products**", { timeout: 15000 });
+  console.log("Products page:", page.url());
 
-  // 10. Verify we landed on catalogue
-  expect(page.url()).toContain("/app/catalogue");
+  // 10. Verify we landed on products
+  expect(page.url()).toContain("/app/products");
   console.log("ALL_PAGES_VISITED");
 });

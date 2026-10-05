@@ -341,12 +341,18 @@ describe("products, brand profile, Studio context and Autopilot", () => {
     it("runs a slot once however often the job is delivered", async () => {
       const r = await ready();
       const a = await createAutopilot(r.p, input(r));
-      await db.autopilot.update({ where: { id: a.id }, data: { nextRunAt: new Date(Date.now() - 60_000) } });
-      assert.equal(await autopilotTick(), 1);
-      assert.equal(await autopilotTick(), 0, "the slot was moved on, so it is not queued again");
-      const slot = new Date(Date.now() - 1000).toISOString();
-      await Promise.all([runAutopilot(a.id, slot), runAutopilot(a.id, slot), runAutopilot(a.id, slot)]);
-      assert.equal(await db.autopilotRun.count({ where: { autopilotId: a.id, slotKey: slot } }), 1);
+      // Earlier suites leave due autopilots behind (the test database is kept between runs), so
+      // assert on THIS autopilot's job rather than the tick's platform-wide return count.
+      const slot = new Date(Date.now() - 60_000);
+      await db.autopilot.update({ where: { id: a.id }, data: { nextRunAt: slot } });
+      const mine = { type: "autopilot.run", dedupeKey: `autopilot:${a.id}:${slot.toISOString()}` };
+      await autopilotTick();
+      assert.equal(await db.job.count({ where: mine }), 1, "the due slot is queued");
+      await autopilotTick();
+      assert.equal(await db.job.count({ where: mine }), 1, "the slot was moved on, so it is not queued again");
+      const raced = new Date(Date.now() - 1000).toISOString();
+      await Promise.all([runAutopilot(a.id, raced), runAutopilot(a.id, raced), runAutopilot(a.id, raced)]);
+      assert.equal(await db.autopilotRun.count({ where: { autopilotId: a.id, slotKey: raced } }), 1);
       assert.equal(await db.generatedAsset.count({ where: { organizationId: r.org.id } }), 1, "one generation, one charge");
     });
 
