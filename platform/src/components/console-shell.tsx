@@ -39,6 +39,7 @@ export type NavIcon =
   | "ai"
   | "bell"
   | "profile"
+  | "blog"
   | "setup";
 
 export interface NavItem {
@@ -68,6 +69,7 @@ export const NAV: NavItem[] = [
   { href: "/app/products", label: "Products", icon: "catalogue", group: "Business", permission: "product:read", scope: "tenant" },
   { href: "/app/orders", label: "Orders", icon: "orders", group: "Business", permission: "order:read", scope: "tenant" },
   { href: "/app/content", label: "Tasks", icon: "tasks", group: "Business", permission: "content:read", scope: "tenant" },
+  { href: "/app/blog", label: "Blog", icon: "blog", group: "Grow", permission: "blog:read", scope: "tenant", tag: "NEW" },
   { href: "/platform", label: "Organisations", icon: "organisations", group: "Account", scope: "platform" },
   { href: "/platform/subscriptions", label: "Subscriptions", icon: "orders", group: "Account", scope: "platform" },
   { href: "/platform/payments", label: "Payments", icon: "billing", group: "Account", scope: "platform" },

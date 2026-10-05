@@ -40,7 +40,7 @@ export default function robots(): MetadataRoute.Robots {
   const live = base.startsWith("https://") && !/localhost|127\.0\.0\.1|\.local\b|\.test\b/.test(base);
   if (!live) return { rules: [{ userAgent: "*", disallow: "/" }] };
   return {
-    rules: [{ userAgent: "*", allow: ["/", "/pricing", "/privacy", "/cookies", "/signup", "/login", "/og"], disallow: PRIVATE }],
+    rules: [{ userAgent: "*", allow: ["/", "/pricing", "/blog", "/privacy", "/cookies", "/signup", "/login", "/og"], disallow: PRIVATE }],
     sitemap: `${base}/sitemap.xml`,
     host: base,
   };

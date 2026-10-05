@@ -38,11 +38,15 @@ describe("robots.txt and sitemap.xml", () => {
     }
   });
 
-  it("lists only public pages, with absolute live URLs", () => {
+  it("lists only public pages, with absolute live URLs", async () => {
     withBase("https://tari.studio");
-    const urls = sitemap().map((e) => e.url);
+    // The sitemap now reads published posts from the database; a unit test has
+    // none reachable, so only the static pages come back.
+    const entries = await sitemap();
+    const urls = entries.map((e) => e.url);
     assert.ok(urls.includes("https://tari.studio") && urls.includes("https://tari.studio/pricing"));
+    assert.ok(urls.includes("https://tari.studio/blog"));
     assert.equal(urls.some((u) => /\/(app|platform|api|order|pay)\b/.test(u)), false);
-    assert.ok(sitemap().every((e) => e.lastModified instanceof Date));
+    assert.ok(entries.every((e) => e.lastModified instanceof Date));
   });
 });

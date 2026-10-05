@@ -15,6 +15,7 @@ import {
   ListChecks,
   Megaphone,
   Menu,
+  Newspaper,
   Package,
   PanelLeftClose,
   PanelLeftOpen,
@@ -73,6 +74,7 @@ const ICONS: Record<NavIcon, LucideIcon> = {
   ai: Cpu,
   bell: Bell,
   profile: CircleUserRound,
+  blog: Newspaper,
   setup: Rocket,
 };
 
