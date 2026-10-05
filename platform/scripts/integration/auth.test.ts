@@ -12,6 +12,7 @@ import { db } from "@/lib/db";
 import { decryptFor } from "@/lib/secrets";
 import { totpAt } from "@/lib/totp";
 import { beginEnrolment, confirmEnrolment, disableMfa } from "@/server/mfa";
+import { POST as loginRoute } from "@/app/api/auth/login/route";
 
 import { DEFAULT_PASSWORD, addMember, makeOrg, makeUser, rejection } from "./_helpers";
 
@@ -183,5 +184,36 @@ describe("organisation context", () => {
     await addMember(user.id, dead.id, "OWNER");
     assert.deepEqual((await activeMemberships(user.id)).map((m) => m.organizationId), [live.id]);
     assert.equal(await switchOrganization(user.id, dead.id), false);
+  });
+
+  it("the login route keeps TOTP_REQUIRED and TOTP_INVALID distinct from a wrong password", async () => {
+    // Regression: the route once collapsed both into INVALID_CREDENTIALS, so an enrolled
+    // account was always told "Email or password is incorrect" and never got the code step.
+    const { user, password } = await makeUser();
+    await db.user.update({ where: { id: user.id }, data: { emailVerifiedAt: new Date() } });
+    const { secret } = await beginEnrolment(user.id);
+    await confirmEnrolment(user.id, totpAt(secret, Date.now()));
+
+    const call = (totp?: string) =>
+      loginRoute(
+        new Request("http://localhost/api/auth/login", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ email: user.email, password, ...(totp ? { totp } : {}) }),
+        }),
+        { params: Promise.resolve({}) },
+      );
+    const codeOf = async (res: Response) => ((await res.json()) as { error?: { code: string } }).error?.code;
+
+    const noCode = await call();
+    assert.equal(noCode.status, 401);
+    assert.equal(await codeOf(noCode), "TOTP_REQUIRED");
+
+    const wrong = await call("000000");
+    assert.equal(wrong.status, 401);
+    assert.equal(await codeOf(wrong), "TOTP_INVALID");
+
+    const right = await call(totpAt(secret, Date.now() + 30_000)); // next window: enrolment consumed the current counter
+    assert.notEqual(right.status, 401, "a valid code passes the two-factor step (success itself is covered at the authenticate() level)");
   });
 });

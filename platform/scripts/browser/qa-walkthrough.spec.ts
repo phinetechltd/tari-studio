@@ -45,7 +45,7 @@ test("full QA walkthrough with screenshots", async ({ page }) => {
   await page.screenshot({ path: `${SHOTS}/02_admin_dashboard.png` });
   console.log("  Screenshot saved: 02_admin_dashboard.png");
 
-  const sections: Array<[string, RegExp, string, string]> = [
+  const sections: Array<[string, RegExp | string, RegExp, string]> = [
     // [step, link name, url match, screenshot]
     ["4", /^Brands$/, /\/app\/brands/, "03_admin_brands"],
     ["5", /Studio/, /\/content/, "04_admin_studio"],
@@ -57,7 +57,8 @@ test("full QA walkthrough with screenshots", async ({ page }) => {
 
   for (const [step, link, url, shot] of sections) {
     try {
-      await page.getByRole("link", { name: link }).first().click();
+      // Scope to the nav rail: an unscoped /Studio/ match hits the "Tari Studio" logo link first.
+      await page.locator("nav").getByRole("link", { name: link }).first().click();
       await page.waitForURL(url, { timeout: 15000 });
       await page.screenshot({ path: `${SHOTS}/${shot}.png` });
       console.log(`Step ${step}: ${shot} - OK (${page.url()})`);

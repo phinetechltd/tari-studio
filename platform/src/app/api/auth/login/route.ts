@@ -21,6 +21,10 @@ export const POST = handler({ public: true }, async ({ request }) => {
         headers: { "Retry-After": String(result.retryAfterSec ?? 60) },
       });
     }
+    // Keep the two-factor states distinct: the form shows its code field on TOTP_REQUIRED.
+    // Collapsing them into INVALID_CREDENTIALS (a past bug) locked every enrolled account out.
+    if (result.reason === "TOTP_REQUIRED") return fail(401, "TOTP_REQUIRED", "Enter the current code from your authenticator app.");
+    if (result.reason === "TOTP_INVALID") return fail(401, "TOTP_INVALID", "That authenticator code did not work. Try the current one.");
     return fail(401, "INVALID_CREDENTIALS", "Email or password is incorrect.");
   }
 
