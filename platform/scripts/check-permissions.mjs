@@ -33,6 +33,11 @@ const PUBLIC_ALLOWLIST = new Set([
   // Google sign-in: state, nonce and PKCE are checked on return (src/server/oauth-google.ts).
   "api/auth/google/start",
   "api/auth/google/callback",
+  // TikTok sign-in (Login Kit): signed state + PKCE; a new identity only ever earns a
+  // pending ticket — the account is created after a verified email (src/server/oauth-tiktok.ts).
+  "api/auth/tiktok/start",
+  "api/auth/tiktok/callback",
+  "api/auth/tiktok/complete",
   "api/auth/invite",
   "api/health",
   // Public ordering from the landing page. Guarded by rate limits per phone,

@@ -7,9 +7,11 @@ import { redirect } from "next/navigation";
 
 import { AuthShell } from "@/components/auth/auth-shell";
 import { GoogleButton, OrDivider } from "@/components/auth/google-button";
+import { TiktokButton } from "@/components/auth/tiktok-button";
 import { getAccountSession, getSessionPrincipal } from "@/lib/auth";
 import { safeNext } from "@/lib/safe-next";
 import { googleEnabled } from "@/server/oauth-google";
+import { tiktokLoginEnabled } from "@/server/oauth-tiktok";
 
 import { LoginForm } from "./login-form";
 
@@ -22,7 +24,8 @@ export const metadata: Metadata = pageMetadata({
 
 const REASONS: Record<string, string> = {
   google: "Google sign-in did not work. Try again, or use your email and password.",
-  cancelled: "Google sign-in was cancelled.",
+  tiktok: "TikTok sign-in did not work. Try again, or use your email and password.",
+  cancelled: "Sign-in was cancelled.",
   totp: "You have two-factor sign-in on, so please sign in with your password and code.",
   expired: "Your session ended. Please sign in again.",
 };
@@ -33,6 +36,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (principal) redirect(safeNext(next) ?? (principal.organizationId === null ? "/platform" : "/app"));
   if (await getAccountSession()) redirect("/welcome");
   const google = googleEnabled();
+  const tiktok = tiktokLoginEnabled();
 
   return (
     <AuthShell
@@ -47,12 +51,9 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       }
     >
       {reason && REASONS[reason] ? <p role="status" className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">{REASONS[reason]}</p> : null}
-      {google ? (
-        <>
-          <GoogleButton next={safeNext(next)} />
-          <OrDivider />
-        </>
-      ) : null}
+      {google ? <GoogleButton next={safeNext(next)} /> : null}
+      {tiktok ? <TiktokButton next={safeNext(next)} /> : null}
+      {google || tiktok ? <OrDivider /> : null}
       <LoginForm next={next ?? null} />
     </AuthShell>
   );

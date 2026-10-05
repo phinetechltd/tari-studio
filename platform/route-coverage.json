@@ -1,0 +1,266 @@
+{
+  "totalRoutes": 158,
+  "totalTestFiles": 20,
+  "categories": {
+    "account": {
+      "routeCount": 9,
+      "tested": true,
+      "testedBy": [
+        "accounts.test.ts (module:accounts)",
+        "auth.test.ts (module:mfa)"
+      ]
+    },
+    "ai": {
+      "routeCount": 3,
+      "tested": true,
+      "testedBy": [
+        "ai-notifications.test.ts (module:ai)",
+        "assistant.test.ts (module:ai)",
+        "platform-settings.test.ts (module:ai)"
+      ]
+    },
+    "assistant": {
+      "routeCount": 4,
+      "tested": true,
+      "testedBy": [
+        "assistant.test.ts (module:assistant)"
+      ]
+    },
+    "auth": {
+      "routeCount": 13,
+      "tested": true,
+      "testedBy": [
+        "accounts.test.ts (module:oauth-google)"
+      ]
+    },
+    "automations": {
+      "routeCount": 2,
+      "tested": true,
+      "testedBy": [
+        "messaging.test.ts (module:automations)",
+        "templates-tiktok.test.ts (module:automations)"
+      ]
+    },
+    "autopilot-runs": {
+      "routeCount": 2,
+      "tested": true,
+      "testedBy": [
+        "products-autopilot.test.ts (module:autopilot)"
+      ]
+    },
+    "autopilots": {
+      "routeCount": 3,
+      "tested": true,
+      "testedBy": [
+        "products-autopilot.test.ts (module:autopilot)"
+      ]
+    },
+    "billing": {
+      "routeCount": 4,
+      "tested": true,
+      "testedBy": [
+        "ai-notifications.test.ts (module:credits)",
+        "orders.test.ts (module:payments)",
+        "platform-admin.test.ts (module:credits)",
+        "platform-admin.test.ts (module:payments)",
+        "pricing.test.ts (module:credits)",
+        "pricing.test.ts (module:payments)",
+        "products-autopilot.test.ts (module:credits)",
+        "tokens-generation.test.ts (module:credits)",
+        "tokens-generation.test.ts (module:payments)"
+      ]
+    },
+    "brands": {
+      "routeCount": 6,
+      "tested": false,
+      "testedBy": []
+    },
+    "campaigns": {
+      "routeCount": 5,
+      "tested": true,
+      "testedBy": [
+        "messaging.test.ts (module:campaigns)"
+      ]
+    },
+    "channels": {
+      "routeCount": 11,
+      "tested": true,
+      "testedBy": [
+        "messaging.test.ts (module:whatsapp)"
+      ]
+    },
+    "characters": {
+      "routeCount": 6,
+      "tested": true,
+      "testedBy": [
+        "templates-characters.test.ts (module:characters)"
+      ]
+    },
+    "content": {
+      "routeCount": 6,
+      "tested": false,
+      "testedBy": []
+    },
+    "health": {
+      "routeCount": 1,
+      "tested": false,
+      "testedBy": []
+    },
+    "inbox": {
+      "routeCount": 5,
+      "tested": false,
+      "testedBy": []
+    },
+    "leads": {
+      "routeCount": 2,
+      "tested": false,
+      "testedBy": []
+    },
+    "notifications": {
+      "routeCount": 1,
+      "tested": true,
+      "testedBy": [
+        "ai-notifications.test.ts (module:notify)"
+      ]
+    },
+    "order-desk": {
+      "routeCount": 1,
+      "tested": true,
+      "testedBy": [
+        "orders.test.ts (module:orders)"
+      ]
+    },
+    "orders": {
+      "routeCount": 5,
+      "tested": true,
+      "testedBy": [
+        "orders.test.ts (module:orders)"
+      ]
+    },
+    "orgs": {
+      "routeCount": 1,
+      "tested": true,
+      "testedBy": [
+        "organizations.test.ts (module:organizations)"
+      ]
+    },
+    "payments": {
+      "routeCount": 2,
+      "tested": true,
+      "testedBy": [
+        "orders.test.ts (module:payments)",
+        "platform-admin.test.ts (module:payments)",
+        "pricing.test.ts (module:payments)",
+        "tokens-generation.test.ts (module:payments)"
+      ]
+    },
+    "pinterest": {
+      "routeCount": 6,
+      "tested": false,
+      "testedBy": []
+    },
+    "platform": {
+      "routeCount": 27,
+      "tested": true,
+      "testedBy": [
+        "ai-notifications.test.ts (module:ai-credits)",
+        "organizations.test.ts (module:organizations)",
+        "templates-characters.test.ts (module:templates)",
+        "templates-tiktok.test.ts (module:templates)"
+      ]
+    },
+    "posts": {
+      "routeCount": 2,
+      "tested": false,
+      "testedBy": []
+    },
+    "products": {
+      "routeCount": 6,
+      "tested": true,
+      "testedBy": [
+        "products-autopilot.test.ts (api-ref)",
+        "products-autopilot.test.ts (module:products)"
+      ]
+    },
+    "setup": {
+      "routeCount": 1,
+      "tested": true,
+      "testedBy": [
+        "ai-notifications.test.ts (module:setup)"
+      ]
+    },
+    "studio": {
+      "routeCount": 9,
+      "tested": true,
+      "testedBy": [
+        "ai-notifications.test.ts (module:generation)",
+        "ai-notifications.test.ts (module:studio)",
+        "products-autopilot.test.ts (module:generation)",
+        "products-autopilot.test.ts (module:studio)",
+        "templates-characters.test.ts (module:studio)",
+        "tokens-generation.test.ts (module:generation)",
+        "tokens-generation.test.ts (module:studio)"
+      ]
+    },
+    "team": {
+      "routeCount": 3,
+      "tested": true,
+      "testedBy": [
+        "invites.test.ts (module:invites)"
+      ]
+    },
+    "teams": {
+      "routeCount": 3,
+      "tested": true,
+      "testedBy": [
+        "accounts.test.ts (module:teams)",
+        "invites.test.ts (module:invites)"
+      ]
+    },
+    "templates": {
+      "routeCount": 6,
+      "tested": true,
+      "testedBy": [
+        "templates-characters.test.ts (module:templates)",
+        "templates-tiktok.test.ts (module:templates)"
+      ]
+    },
+    "webhooks": {
+      "routeCount": 3,
+      "tested": true,
+      "testedBy": [
+        "messaging.test.ts (module:whatsapp)"
+      ]
+    }
+  },
+  "untestedRoutes": [
+    "/brands",
+    "/brands/:id",
+    "/brands/:id/attachments",
+    "/brands/:id/attachments/:attId",
+    "/brands/:id/cover",
+    "/brands/:id/logo",
+    "/content",
+    "/content/:id",
+    "/content/assets",
+    "/content/assets/:id",
+    "/content/assets/:id/file",
+    "/content/assets/:id/showcase",
+    "/health",
+    "/inbox",
+    "/inbox/:id",
+    "/inbox/:id/messages",
+    "/inbox/:id/suggest",
+    "/inbox/simulate",
+    "/leads",
+    "/leads/:id",
+    "/pinterest",
+    "/pinterest/boards",
+    "/pinterest/callback",
+    "/pinterest/link",
+    "/pinterest/search",
+    "/pinterest/start",
+    "/posts",
+    "/posts/:id"
+  ]
+}
