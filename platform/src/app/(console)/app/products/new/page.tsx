@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
-import { emptyProduct, ProductForm } from "@/components/products/product-form";
+import { emptyProduct } from "@/components/products/product-values";
+import { ProductForm } from "@/components/products/product-form";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { requirePermission } from "@/lib/session";

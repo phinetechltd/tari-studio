@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { ProductForm, priceText } from "@/components/products/product-form";
+import { ProductForm } from "@/components/products/product-form";
+import { priceText } from "@/components/products/product-values";
 import { StockPanel } from "@/components/products/stock-panel";
 import { Badge, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";

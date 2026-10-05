@@ -5,34 +5,10 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 
 import { callApi } from "@/components/landing/order-events";
+import { emptyProduct, priceText, type ProductFormValues } from "@/components/products/product-values";
 import { INPUT_IMAGE_HELP, INPUT_IMAGE_LIMITS } from "@/lib/generation-models";
-import { fromCents, parseAmountToCents } from "@/lib/money";
+import { parseAmountToCents } from "@/lib/money";
 
-export interface ProductFormValues {
-  id?: string;
-  brandId: string;
-  name: string;
-  sku: string;
-  description: string;
-  price: string;
-  category: string;
-  unit: string;
-  url: string;
-  details: Array<{ name: string; value: string }>;
-  trackStock: boolean;
-  stockQty: string;
-  lowStockAt: string;
-  archived?: boolean;
-  images: Array<{ id: string; url: string }>;
-}
-
-export function emptyProduct(brandId: string): ProductFormValues {
-  return { brandId, name: "", sku: "", description: "", price: "", category: "", unit: "", url: "", details: [], trackStock: false, stockQty: "0", lowStockAt: "", images: [] };
-}
-
-export function priceText(cents: number | null): string {
-  return cents === null ? "" : String(fromCents(cents));
-}
 
 async function postFiles(url: string, files: File[]): Promise<string | null> {
   const form = new FormData();
