@@ -48,6 +48,9 @@ export type Permission =
   | "audit:read"
   | "brand:read"
   | "brand:write"
+  // Blog (core: every organisation may keep one; the public site shows the operator's)
+  | "blog:read"
+  | "blog:write"
   // Products (module PRODUCTS)
   | "product:read"
   | "product:write"
@@ -150,7 +153,7 @@ export const MFA_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
   "member:write",
 ]);
 
-const READ_BASICS: Permission[] = ["org:read", "brand:read", "product:read"];
+const READ_BASICS: Permission[] = ["org:read", "brand:read", "product:read", "blog:read"];
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   SUPER_ADMIN: ["platform:manage"], // expanded to everything below
@@ -167,6 +170,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "autopilot:read",
     "autopilot:write",
     "assistant:use",
+    "blog:write",
     "content:read",
     "task:write",
     "content:approve",
@@ -197,6 +201,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   BRAND_MANAGER: [
     ...READ_BASICS,
     "member:read",
+    "blog:write",
     "brand:write",
     "product:write",
     "product:stock",
@@ -250,6 +255,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
 
   MARKETER: [
     ...READ_BASICS,
+    "blog:write",
     "product:write",
     "autopilot:read",
     "autopilot:write",
