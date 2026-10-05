@@ -61,6 +61,8 @@ model Organization {
   autopilots       Autopilot[]
   autopilotRuns    AutopilotRun[]
   assistantThreads AssistantThread[]
+  blogCategories   BlogCategory[]
+  blogPosts        BlogPost[]
 }
 
 /// The licensing gate: a module the tenant has bought. Read on every request,
@@ -136,6 +138,7 @@ model User {
   createdLinks            TrackedLink[]            @relation("LinkCreator")
   dashboard               UserDashboard?
   studioThreads           StudioThread[]           @relation("StudioThreadCreator")
+  blogPosts               BlogPost[]               @relation("BlogAuthor")
 }
 
 model Membership {
@@ -2004,4 +2007,65 @@ model AssistantProposal {
 
   @@index([messageId])
   @@index([organizationId, userId, status])
+}
+
+/// A heading the public blog groups posts under (News, Guides, Case studies).
+/// Scoped to the organisation; each slug is unique within it.
+model BlogCategory {
+  id             String       @id @default(cuid())
+  organizationId String
+  name           String
+  slug           String
+  description    String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  posts          BlogPost[]
+
+  @@unique([organizationId, slug])
+  @@index([organizationId])
+}
+
+/// A blog entry: written by an admin or drafted by AI, reviewed, then published.
+/// Published posts of the operator's organisation (BLOG_ORGANIZATION_SLUG) are
+/// public at /blog/<slug>; drafts and archived posts never leave the console.
+/// Status flow: DRAFT -> PUBLISHED (or ARCHIVED to take it off the site).
+model BlogPost {
+  id             String        @id @default(cuid())
+  organizationId String
+  title          String
+  /// Kebab-case, unique within the organisation; from the title unless the author overrides it
+  slug           String
+  /// The short standfirst shown on cards and used as the default SEO description
+  excerpt        String?
+  /// The article itself, in Markdown
+  body           String        @default("")
+  /// Cover image URL, shown on the card and the article
+  coverImageUrl  String?
+  /// DRAFT | PUBLISHED | ARCHIVED
+  status         String        @default("DRAFT")
+  publishedAt    DateTime?
+  categoryId     String?
+  authorId       String?
+  /// SEO: title tag (falls back to the post title), meta description, keywords
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String[]      @default([])
+  /// Share-card image; the generated /og card is used when empty
+  ogImageUrl     String?
+  /// Overrides the canonical link (only for content republished from elsewhere)
+  canonicalUrl   String?
+  /// Keep this post out of search results while it stays readable by link
+  noindex        Boolean       @default(false)
+  /// AI draft provenance: prompt, model, request id (src/server/blog.ts)
+  aiMetadata     Json?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  author         User?         @relation("BlogAuthor", fields: [authorId], references: [id])
+  category       BlogCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  organization   Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, slug])
+  @@index([organizationId, status, publishedAt])
+  @@index([categoryId])
 }

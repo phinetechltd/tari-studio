@@ -116,6 +116,8 @@ const schema = z.object({
   STORAGE_DIR: z.string().default("storage"),
   /** The organisation that owns public orders from the landing page (the operator's own agency) */
   ORDERS_ORGANIZATION_SLUG: z.string().default("demo-agency"),
+  /** The organisation whose published posts appear on the public blog; defaults to the orders organisation */
+  BLOG_ORGANIZATION_SLUG: z.string().optional(),
   REQUIRE_TOTP: z
     .string()
     .transform((v) => v !== "0" && v !== "false" && v !== "")
