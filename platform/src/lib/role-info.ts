@@ -37,6 +37,9 @@ export const PERMISSION_GROUPS: Array<{ title: string; items: Array<{ key: strin
     { key: "template:read", label: "Use templates" },
     { key: "character:read", label: "See characters" }, { key: "character:write", label: "Create characters" },
   ] },
+  { title: "Assistant", items: [
+    { key: "assistant:use", label: "Chat with the assistant" },
+  ] },
   { title: "Autopilot", items: [
     { key: "autopilot:read", label: "See Autopilot and its runs" }, { key: "autopilot:write", label: "Create and change Autopilots" },
   ] },

@@ -60,6 +60,7 @@ model Organization {
   characters       Character[]
   autopilots       Autopilot[]
   autopilotRuns    AutopilotRun[]
+  assistantThreads AssistantThread[]
 }
 
 /// The licensing gate: a module the tenant has bought. Read on every request,
@@ -1947,4 +1948,60 @@ model AuthToken {
 
   @@index([userId, purpose, usedAt])
   @@index([expiresAt])
+}
+
+/// A conversation with the in-app assistant (src/server/assistant.ts). Belongs to one person in one team.
+model AssistantThread {
+  id             String             @id @default(cuid())
+  organizationId String
+  userId         String
+  title          String             @default("New chat")
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  messages       AssistantMessage[]
+
+  @@index([organizationId, userId, updatedAt])
+}
+
+model AssistantMessage {
+  id             String              @id @default(cuid())
+  threadId       String
+  organizationId String
+  /// USER | ASSISTANT
+  role           String
+  text           String
+  /// Pictures the person attached: [{ key, mimeType }] (stored files, served only to the team)
+  attachments    Json                @default("[]")
+  /// "free" | "paid": which assistant answered
+  tier           String?
+  model          String?
+  createdAt      DateTime            @default(now())
+  thread         AssistantThread     @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  proposals      AssistantProposal[]
+
+  @@index([threadId, createdAt])
+  @@index([organizationId, role, createdAt])
+}
+
+/// Something the assistant suggests doing. Nothing happens until the person presses Apply.
+model AssistantProposal {
+  id             String           @id @default(cuid())
+  messageId      String
+  organizationId String
+  userId         String
+  tool           String
+  args           Json
+  /// What it would do, in plain words
+  summary        String
+  /// PENDING | APPLIED | DISMISSED | EXPIRED | FAILED
+  status         String           @default("PENDING")
+  result         Json?
+  error          String?
+  createdAt      DateTime         @default(now())
+  decidedAt      DateTime?
+  message        AssistantMessage @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+  @@index([organizationId, userId, status])
 }

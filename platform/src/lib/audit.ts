@@ -101,7 +101,13 @@ export type AuditAction =
   | "AUTOPILOT_DELETE"
   | "AUTOPILOT_RUN"
   | "AUTOPILOT_APPROVE"
-  | "AUTOPILOT_REJECT";
+  | "AUTOPILOT_REJECT"
+  // The in-app assistant
+  | "ASSISTANT_CONFIG_UPDATE"
+  | "ASSISTANT_MESSAGE"
+  | "ASSISTANT_BLOCKED"
+  | "ASSISTANT_PROPOSAL_APPLY"
+  | "ASSISTANT_PROPOSAL_DISMISS";
 
 export interface AuditInput {
   organizationId?: string | null;

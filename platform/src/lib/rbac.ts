@@ -91,7 +91,9 @@ export type Permission =
   | "lead:write"
   // Autopilot
   | "autopilot:read"
-  | "autopilot:write";
+  | "autopilot:write"
+  // The in-app assistant (what it can do on a person's behalf is still limited by their own permissions)
+  | "assistant:use";
 
 /**
  * Which module owns each permission. Permissions absent from this map belong to
@@ -164,6 +166,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "product:stock",
     "autopilot:read",
     "autopilot:write",
+    "assistant:use",
     "content:read",
     "task:write",
     "content:approve",
@@ -199,6 +202,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "product:stock",
     "autopilot:read",
     "autopilot:write",
+    "assistant:use",
     "content:read",
     "task:write",
     "channel:read",
@@ -249,6 +253,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "product:write",
     "autopilot:read",
     "autopilot:write",
+    "assistant:use",
     "content:read",
     "task:write",
     "post:read",

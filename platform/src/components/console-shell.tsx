@@ -54,6 +54,7 @@ export interface NavItem {
 export const NAV: NavItem[] = [
   { href: "/app", label: "Home", icon: "home", group: "Create", scope: "tenant" },
   { href: "/content", label: "Studio", icon: "studio", group: "Create", permission: "ai:generate", scope: "tenant", tag: "HOT" },
+  { href: "/app/assistant", label: "Assistant", icon: "ai", group: "Create", permission: "assistant:use", scope: "tenant", tag: "NEW" },
   { href: "/content/assets", label: "Library", icon: "library", group: "Create", permission: "ai:generate", scope: "tenant" },
   { href: "/app/templates", label: "Templates", icon: "templates", group: "Create", permission: "template:read", scope: "tenant", tag: "NEW" },
   { href: "/app/characters", label: "Characters", icon: "characters", group: "Create", permission: "character:read", scope: "tenant", tag: "NEW" },
@@ -74,6 +75,7 @@ export const NAV: NavItem[] = [
   { href: "/platform/templates", label: "Templates", icon: "templates", group: "Account", scope: "platform" },
   { href: "/platform/pricing", label: "Pricing", icon: "catalogue", group: "Account", scope: "platform" },
   { href: "/platform/ai", label: "AI & credits", icon: "ai", group: "Account", scope: "platform" },
+  { href: "/platform/assistant", label: "Assistant", icon: "ai", group: "Account", scope: "platform" },
   { href: "/platform/notifications", label: "Notifications", icon: "bell", group: "Account", scope: "platform" },
   { href: "/app/teams", label: "My teams", icon: "teams", group: "Account", scope: "tenant" },
   { href: "/app/team", label: "Team", icon: "team", group: "Account", permission: "member:read", scope: "tenant" },
