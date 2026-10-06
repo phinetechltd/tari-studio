@@ -142,6 +142,14 @@ export const PLATFORM_SETTINGS: PlatformSettingSpec[] = [
     placeholder: "sk_live_…",
     help: "Paystack dashboard, Settings, API Keys & Webhooks. It also signs the webhook: set the webhook URL to /api/webhooks/paystack.",
   },
+  {
+    key: "PAYSTACK_PUBLIC_KEY",
+    label: "Public key",
+    group: "paystack",
+    secret: false,
+    placeholder: "pk_live_…",
+    help: "Paystack's public key (pk_…), from the same API Keys page. Safe to show in browsers; the secret key alone charges and signs.",
+  },
 
   {
     key: "EMAIL_PROVIDER",

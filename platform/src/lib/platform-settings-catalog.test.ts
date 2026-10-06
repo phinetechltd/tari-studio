@@ -15,7 +15,7 @@ const SAMPLES: Record<string, string> = {
 };
 
 /** Identifiers that are public by design: they appear in every sign-in URL. */
-const PUBLIC_IDS = new Set(["META_APP_ID", "TIKTOK_CLIENT_KEY"]);
+const PUBLIC_IDS = new Set(["META_APP_ID", "TIKTOK_CLIENT_KEY", "PAYSTACK_PUBLIC_KEY"]); // app ids and Paystack's publishable key are safe to show by design
 
 const BASE = { DATABASE_URL: "postgresql://x@localhost/x", AUTH_SECRET: "a-test-secret-that-is-long-enough-0123" };
 

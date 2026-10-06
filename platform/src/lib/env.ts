@@ -86,6 +86,8 @@ const schema = z.object({
   PAYSTACK_PROVIDER: z.enum(["simulator", "paystack", "off"]).default("simulator"),
   /** sk_live_… or sk_test_…; also the key that signs Paystack's webhooks */
   PAYSTACK_SECRET_KEY: z.string().optional(),
+  /** pk_live_… / pk_test_… — Paystack's public key, for card fields embedded in our pages */
+  PAYSTACK_PUBLIC_KEY: z.string().optional(),
   /** Image and video generation. "simulator" returns sample media; production refuses it. */
   /**
    * TikTok: Login Kit + Content Posting API (developers.tiktok.com) for posting,
