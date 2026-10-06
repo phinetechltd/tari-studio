@@ -154,6 +154,39 @@ export function breadcrumbLd(base: string, trail: Array<{ name: string; path: st
   };
 }
 
+/** A blog article, for Google's article features and rich results. */
+export function blogPostingLd(p: {
+  headline: string;
+  description: string;
+  url: string;
+  image?: string;
+  datePublished: string;
+  dateModified: string;
+  authorName: string;
+  publisherName: string;
+  publisherUrl: string;
+  keywords?: string[];
+  section?: string;
+}): Thing {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    "@id": `${p.url}#article`,
+    headline: p.headline,
+    description: p.description,
+    url: p.url,
+    mainEntityOfPage: p.url,
+    ...(p.image ? { image: [p.image] } : {}),
+    datePublished: p.datePublished,
+    dateModified: p.dateModified,
+    inLanguage: "en-KE",
+    author: { "@type": "Person", name: p.authorName },
+    publisher: { "@type": "Organization", name: p.publisherName, url: p.publisherUrl },
+    ...(p.section ? { articleSection: p.section } : {}),
+    ...(p.keywords?.length ? { keywords: p.keywords.join(", ") } : {}),
+  };
+}
+
 export function videoLd(v: { name: string; description: string; thumbnailUrl: string; contentUrl: string; uploadDate: string; durationSeconds?: number }): Thing {
   return {
     "@context": "https://schema.org",
