@@ -51,9 +51,15 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
       }
     >
       {reason && REASONS[reason] ? <p role="status" className="mb-4 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm text-warning">{REASONS[reason]}</p> : null}
-      {google ? <GoogleButton next={safeNext(next)} /> : null}
-      {tiktok ? <TiktokButton next={safeNext(next)} /> : null}
-      {google || tiktok ? <OrDivider /> : null}
+      {google || tiktok ? (
+        <>
+          <div className="space-y-3">
+            {google ? <GoogleButton next={safeNext(next)} /> : null}
+            {tiktok ? <TiktokButton next={safeNext(next)} /> : null}
+          </div>
+          <OrDivider />
+        </>
+      ) : null}
       <LoginForm next={next ?? null} />
     </AuthShell>
   );

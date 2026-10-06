@@ -64,9 +64,15 @@ export default async function SignupPage({ searchParams }: { searchParams: Promi
         </>
       }
     >
-      {google ? <GoogleButton label="Sign up with Google" /> : null}
-      {tiktokOn ? <TiktokButton label="Sign up with TikTok" /> : null}
-      {google || tiktokOn ? <OrDivider /> : null}
+      {google || tiktokOn ? (
+        <>
+          <div className="space-y-3">
+            {google ? <GoogleButton label="Sign up with Google" /> : null}
+            {tiktokOn ? <TiktokButton label="Sign up with TikTok" /> : null}
+          </div>
+          <OrDivider />
+        </>
+      ) : null}
       <SignupForm />
     </AuthShell>
   );
