@@ -4,6 +4,7 @@ import { ImagePlus, LoaderIcon, Plus, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 
+import { AiSuggestionBar, useImageAutofill } from "@/components/ai/autofill";
 import { callApi } from "@/components/landing/order-events";
 import { emptyProduct, priceText, type ProductFormValues } from "@/components/products/product-values";
 import { INPUT_IMAGE_HELP, INPUT_IMAGE_LIMITS } from "@/lib/generation-models";
@@ -36,6 +37,16 @@ export function ProductForm({ initial, brands }: { initial: ProductFormValues; b
   const [fields, setFields] = useState<Record<string, string>>({});
   const [notice, setNotice] = useState<string | null>(null);
   const creating = !v.id;
+
+  // Picture → details: choosing the first picture drafts an empty name and
+  // description from what it shows. Never overwrites typed text.
+  const autofill = useImageAutofill({
+    formKind: "product",
+    getFields: () => ({ name: v.name, description: v.description, category: v.category }),
+    getFile: () => picked[0] ?? null,
+    brandId: () => v.brandId || null,
+    onApply: (field, value) => setV((s) => ({ ...s, [field]: value })),
+  });
 
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -227,8 +238,30 @@ export function ProductForm({ initial, brands }: { initial: ProductFormValues; b
         <label className="btn-quiet cursor-pointer">
           <ImagePlus className="h-4 w-4" />
           {picked.length > 0 ? `${picked.length} picture${picked.length === 1 ? "" : "s"} chosen` : "Choose pictures"}
-          <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={(e) => setPicked(Array.from(e.target.files ?? []))} />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            multiple
+            className="sr-only"
+            onChange={(e) => {
+              const files = Array.from(e.target.files ?? []);
+              setPicked(files);
+              if (files[0] && (!v.name.trim() || !v.description.trim())) void autofill.run();
+            }}
+          />
         </label>
+        <div className="mt-2">
+          <AiSuggestionBar
+            suggestions={autofill.suggestions}
+            busy={autofill.busy}
+            quietReason={autofill.quietReason}
+            onApply={autofill.apply}
+            onApplyAll={autofill.applyAll}
+            onRegenerate={() => void autofill.run()}
+            onDismiss={autofill.reset}
+          />
+        </div>
         <p className="mt-1 text-xs text-muted">
           {INPUT_IMAGE_HELP} At most {INPUT_IMAGE_LIMITS.perItem} per product. The first picture is the one a video can start from.
         </p>

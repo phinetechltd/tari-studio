@@ -8,7 +8,7 @@ export { createTask, listTasks, getTask, updateTask } from "./content";
 export { connectMetaPages, connectWhatsAppNumber, listChannels, disconnectChannel, schedulePosts, listPosts } from "./social";
 export { createCampaign, listCampaigns, getCampaignDetail, updateCampaign, archiveCampaign, createTrackedLink } from "./campaigns";
 export { createProduct, listProducts, updateProduct, archiveProduct } from "./products";
-export { generateAi, generateForOrganization, aiStatus, resolveModel, getAiProviderName } from "./ai";
+export { generateAi, generateForOrganization, analyzeImage, aiStatus, resolveModel, getAiProviderName } from "./ai";
 export { processWebhook, sendWhatsAppText, listConversations, listContacts } from "./whatsapp";
 export { fireAutomations, listAutomations, createAutomation } from "./automations";
 export { sendEmail } from "./email";

@@ -2,8 +2,9 @@
 
 import { CalendarClock, ImageIcon, RefreshCw, Send, Sparkles, Unplug, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { AiSuggestionBar, useImageAutofill } from "@/components/ai/autofill";
 import { callApi } from "@/components/json-form";
 import type { TikTokOptions } from "@/lib/tiktok";
 import { cn } from "@/lib/utils";
@@ -121,6 +122,27 @@ export function Composer(props: ComposerProps) {
   const asset = props.assets.find((a) => a.id === assetId) ?? null;
   const campaigns = useMemo(() => props.campaigns.filter((c) => !brandId || c.brandId === brandId), [props.campaigns, brandId]);
 
+  // Image → caption: picking an image asset fills an empty caption automatically.
+  // Never overwrites what was typed; the suggestion arrives as an editable chip.
+  const autofill = useImageAutofill({
+    formKind: "post",
+    getFields: () => ({ caption: text }),
+    getAssetId: () => assetId,
+    brandId: () => brandId,
+    onApply: (_field, value) => setText(value),
+  });
+
+  useEffect(() => {
+    if (!assetId) {
+      autofill.reset();
+      return;
+    }
+    const picked = props.assets.find((a) => a.id === assetId);
+    if (picked && picked.mediaType === "IMAGE" && !text.trim() && props.canUseAi) void autofill.run();
+    // Values are read fresh at call time; re-running on every render is not wanted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetId]);
+
   const draftWithAi = async () => {
     if (!brandId || !brief.trim()) return setMessage({ ok: false, text: "Pick a channel and describe the post first." });
     setDrafting(true);
@@ -216,6 +238,19 @@ export function Composer(props: ComposerProps) {
         </label>
         <textarea id="caption" value={text} onChange={(e) => setText(e.target.value)} rows={5} maxLength={2200} className="input py-2.5" placeholder="What the post says" />
         <p className="mt-1 text-right text-[11px] text-muted">{text.length} / 2,200</p>
+        {props.canUseAi ? (
+          <div className="mt-2">
+            <AiSuggestionBar
+              suggestions={autofill.suggestions}
+              busy={autofill.busy}
+              quietReason={autofill.quietReason}
+              onApply={autofill.apply}
+              onApplyAll={autofill.applyAll}
+              onRegenerate={() => void autofill.run()}
+              onDismiss={autofill.reset}
+            />
+          </div>
+        ) : null}
       </div>
 
       {tiktokChannel ? <TikTokPostOptions channelId={tiktokChannel.id} value={tiktok} onChange={setTiktok} /> : null}

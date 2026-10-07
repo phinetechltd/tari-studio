@@ -196,7 +196,7 @@ export async function imageDimensions(bytes: Uint8Array): Promise<{ width: numbe
  * The bytes to send to the provider: the stored picture, scaled down when its long side is over
  * `sendMaxSide`. Returns the original untouched when it is already small enough.
  */
-export async function bytesForProvider(key: string): Promise<{ bytes: Buffer; mimeType: string }> {
+export async function bytesForProvider(key: string): Promise<{ bytes: Buffer; mimeType: "image/png" | "image/jpeg" | "image/webp" }> {
   const raw = await readFile(resolveKey(key));
   const kind = sniffImage(raw);
   if (!kind) throw new UploadError("That stored file is not an image.");
@@ -210,7 +210,7 @@ export async function bytesForProvider(key: string): Promise<{ bytes: Buffer; mi
 }
 
 /** What an uploaded image really is, from its first bytes, never from its name or content-type. */
-export function sniffImage(bytes: Uint8Array): { mimeType: string; ext: string } | null {
+export function sniffImage(bytes: Uint8Array): { mimeType: "image/png" | "image/jpeg" | "image/webp"; ext: ".png" | ".jpg" | ".webp" } | null {
   if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) return { mimeType: "image/png", ext: ".png" };
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return { mimeType: "image/jpeg", ext: ".jpg" };
   if (

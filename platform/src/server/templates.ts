@@ -12,8 +12,9 @@ import { isPinterestImageUrl, pinPromptHint, type PinResult } from "@/lib/pinter
 import type { Principal } from "@/lib/rbac";
 
 import { accessTokenOf, activeAccount } from "./external-accounts";
+import { analyzeImage } from "./ai";
 import { pinFromLink, pinterest, pinterestFeatures } from "./pinterest";
-import { removeStored, saveUpload, UploadError } from "./storage";
+import { bytesForProvider, removeStored, saveUpload, UploadError } from "./storage";
 
 /**
  * Templates: a description and an image pack that shapes what the Studio makes.
@@ -559,6 +560,36 @@ export async function templateFromPins(principal: Principal, raw: unknown, reque
   } catch (e) {
     await db.template.delete({ where: { id: t.id } }).catch(() => undefined);
     throw e;
+  }
+  // The pins themselves say what the template is about: with no title from the
+  // person, the platform AI reads the first pin and drafts the title,
+  // description and prompt hint. A failure keeps the plain defaults above —
+  // the template still works, and everything stays editable.
+  if (!input.title) {
+    try {
+      const first = await db.templateImage.findFirst({ where: { templateId: t.id }, orderBy: { sortOrder: "asc" }, select: { storageKey: true } });
+      if (first?.storageKey) {
+        const bytes = await bytesForProvider(first.storageKey);
+        const draft = await analyzeImage({
+          image: { mimeType: bytes.mimeType, dataBase64: bytes.bytes.toString("base64") },
+          organizationId,
+          formKind: "template",
+          context: `Pinterest pins the person picked for a new template (${pins.length} in the pack)`,
+        });
+        if (draft) {
+          await db.template.update({
+            where: { id: t.id },
+            data: {
+              ...(draft.title ? { title: draft.title.slice(0, 120) } : {}),
+              ...(draft.description ? { description: draft.description.slice(0, 4000) } : {}),
+              ...(draft.keywords?.length ? { promptHint: draft.keywords.join(", ").slice(0, 600) } : {}),
+            },
+          });
+        }
+      }
+    } catch (e) {
+      console.error("[templates] pinterest autofill skipped:", e instanceof Error ? e.message.slice(0, 200) : e);
+    }
   }
   const ready = await db.template.update({ where: { id: t.id }, data: { status: "PUBLISHED" }, include: { images: { orderBy: { sortOrder: "asc" }, take: 1, select: { id: true } } } });
   return { id: ready.id, title: ready.title, coverId: ready.images[0]?.id ?? null, coverUrl: ready.images[0] ? imageUrl(ready.images[0].id) : null };
