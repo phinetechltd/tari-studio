@@ -5,8 +5,10 @@ import { z } from "zod";
  * (Platform admin → Assistant). Pure: shared by the server, the admin screen and the tests.
  *
  * Two tiers. "free" is the default system AI everybody gets; "paid" is for teams that pay
- * (an active plan, or credits bought in the last 90 days) and normally runs Claude. Each tool
- * can be switched off, or limited to paying teams. The fixed safety rules in
+ * (an active plan, or credits bought in the last 90 days) with more messages and longer
+ * answers. Both tiers run on the platform's managed AI keys — the tier never
+ * changes whose key is used, only the quotas, model and features. Each tool can be
+ * switched off, or limited to paying teams. The fixed safety rules in
  * src/lib/assistant-guard.ts are not settings: the admin can add to the assistant's
  * persona, but cannot remove the rules.
  */
@@ -89,7 +91,7 @@ export const ASSISTANT_TOOL_KEYS = ASSISTANT_TOOLS.map((t) => t.key) as unknown 
 export type Tier = "free" | "paid";
 
 const tierSchema = z.object({
-  /** "anthropic" (Claude), "nvidia" (the free hosted models) or "platform" (whatever the deployment's AI chain is) */
+  /** "anthropic" (Claude), "nvidia" (the hosted models) or "platform" (whatever the deployment's AI chain is) */
   provider: z.enum(["anthropic", "nvidia", "platform"]),
   /** Empty = the provider's default model */
   model: z.string().trim().max(120).default(""),
@@ -127,8 +129,11 @@ export function defaultAssistantConfig(): AssistantConfig {
     name: "Tari Assistant",
     persona: "Be warm, brief and practical. The people you help run small businesses and agencies in Kenya. Prefer plain words, and use Kenyan shillings (KES) for prices.",
     welcome: "Hi! I can fill in your brand from a logo or photo, create characters and templates, and turn rough ideas into prompts that work.",
-    free: { provider: "nvidia", model: "", maxOutputTokens: 1200, dailyMessages: 15, vision: false },
-    paid: { provider: "anthropic", model: "", maxOutputTokens: 3000, dailyMessages: 200, vision: true },
+    // Both tiers run on the platform's NVIDIA models (Kimi K3 by default —
+    // see NVIDIA_DEFAULT_MODEL in src/server/ai.ts). The paid tier simply
+    // allows more messages and longer answers.
+    free: { provider: "nvidia", model: "", maxOutputTokens: 1500, dailyMessages: 15, vision: true },
+    paid: { provider: "nvidia", model: "", maxOutputTokens: 3000, dailyMessages: 200, vision: true },
     tools: Object.fromEntries(ASSISTANT_TOOLS.map((t) => [t.key, { enabled: true, paidOnly: t.defaultPaidOnly }])) as AssistantConfig["tools"],
     maxToolSteps: 3,
     maxInputChars: 3000,

@@ -207,6 +207,12 @@ function normaliseError(error: unknown): NextResponse {
   if (name === "AiNotConfiguredError" || name === "StandInProviderError") {
     return fail(503, "PROVIDER_NOT_CONFIGURED", (error as Error).message);
   }
+  if (name === "AiUnavailableError") {
+    // The safe message was built at the throw site; the real reason and the
+    // provider/model detail are in the server log under the same requestId.
+    const requestId = (error as { requestId?: string }).requestId;
+    return fail(503, "AI_UNAVAILABLE", (error as Error).message, requestId ? { requestId } : undefined);
+  }
   if (name === "AiRefusedError") return fail(422, "AI_REFUSED", (error as Error).message);
 
   const message = error instanceof Error ? error.message : String(error);

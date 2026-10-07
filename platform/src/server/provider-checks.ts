@@ -3,7 +3,7 @@ import "server-only";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
 
-import { aiStatus, probeAi } from "./ai";
+import { aiStatus, probeProvider } from "./ai";
 
 /**
  * Live connectivity checks for every external provider, used by the platform
@@ -35,18 +35,34 @@ export async function runProviderChecks(): Promise<ProviderCheck[]> {
 
   const status = aiStatus();
   const chain = status.chain.map((c) => `${c.provider}:${c.model}${c.keyLoaded ? "" : " (no key)"}`).join(" → ");
-  if (status.chain.every((c) => c.provider === "fixtures")) {
-    results.push({ name: "AI", outcome: "skip", detail: `Fixtures only. Choose Anthropic and add a key to use Claude.` });
+  // Every distinct provider+model the deployment can run: the chain's standard and
+  // quick models, plus the assistant tiers' explicit choices. A dead model id
+  // (NVIDIA retires ids; a typo in the console) fails here loudly, with its HTTP
+  // status, instead of surfacing to users as "something went wrong".
+  const targets = new Map<string, { provider: "anthropic" | "nvidia" | "fixtures"; model: string }>();
+  for (const c of status.chain) {
+    if (c.provider === "fixtures") continue;
+    if (!c.keyLoaded) continue;
+    targets.set(`${c.provider}:${c.model}`, { provider: c.provider, model: c.model });
+    if (c.quickModel && !targets.has(`${c.provider}:${c.quickModel}`)) targets.set(`${c.provider}:${c.quickModel}`, { provider: c.provider, model: c.quickModel });
+  }
+  if (status.chain.length === 0 || status.chain.every((c) => c.provider === "fixtures")) {
+    results.push({ name: "AI", outcome: "skip", detail: "Fixtures only. Choose a provider and add a key under Deployment keys." });
   } else {
-    try {
-      const r = await probeAi();
-      results.push({
-        name: "AI",
-        outcome: "ok",
-        detail: `${r.provider} ${r.model} answered in ${r.latencyMs} ms (${r.inputTokens} in / ${r.outputTokens} out tokens): “${r.text.slice(0, 60)}”`,
-      });
-    } catch (error) {
-      results.push({ name: "AI", outcome: "fail", detail: `${chain}: ${message(error)}` });
+    if (targets.size === 0) {
+      results.push({ name: "AI", outcome: "skip", detail: `${chain}: no API key is loaded for any entry.` });
+    }
+    for (const [label, t] of targets) {
+      try {
+        const r = await probeProvider(t.provider, t.model);
+        results.push({
+          name: `AI (${label})`,
+          outcome: "ok",
+          detail: `${r.provider} ${r.model} answered in ${r.latencyMs} ms (${r.inputTokens} in / ${r.outputTokens} out tokens): "${r.text.slice(0, 60)}"`,
+        });
+      } catch (error) {
+        results.push({ name: `AI (${label})`, outcome: "fail", detail: `${label}: ${message(error)}` });
+      }
     }
   }
 

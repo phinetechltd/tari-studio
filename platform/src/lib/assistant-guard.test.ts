@@ -82,12 +82,15 @@ describe("keeping data apart from instructions", () => {
 });
 
 describe("settings", () => {
-  it("start with the free tier on the hosted models and the paid tier on Claude", () => {
+  it("start both tiers on the platform's hosted models, with vision for image work", () => {
     const c = defaultAssistantConfig();
     assert.equal(c.free.provider, "nvidia");
-    assert.equal(c.paid.provider, "anthropic");
-    assert.equal(c.free.vision, false);
+    assert.equal(c.paid.provider, "nvidia");
+    assert.equal(c.free.vision, true);
     assert.equal(c.paid.vision, true);
+    // The tier changes quotas, never whose key runs: paid simply allows more.
+    assert.ok(c.paid.dailyMessages > c.free.dailyMessages);
+    assert.ok(c.paid.maxOutputTokens >= c.free.maxOutputTokens);
   });
 
   it("keep image creation for paying teams, and honour the admin's switches", () => {
