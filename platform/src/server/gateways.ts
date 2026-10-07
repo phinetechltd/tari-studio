@@ -1,26 +1,29 @@
 import "server-only";
 
+import { ApiError } from "@/lib/api";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
-import { configuredProviderName } from "@/lib/providers";
 import { decryptFor, encryptFor, secretsAvailable } from "@/lib/secrets";
 
 /**
- * Per-organisation gateway settings: the keys and model choices an Owner sets
- * from the console, stored in the Setting table (one row per gateway).
+ * Per-organisation gateway settings: the keys an Owner sets from the console,
+ * stored in the Setting table (one row per gateway).
  *
  * Two rules shape this file.
  *
- *  - The operator's environment remains the default. An org setting overrides
- *    it per gateway, so one agency can bring its own Meta app or NVIDIA key
- *    without the deployment changing.
+ *  - Agencies manage only their own social media app here. AI, image/video
+ *    generation and payment credentials are platform-managed exclusively —
+ *    they belong to the platform admin (console Deployment keys), and no
+ *    agency setting may override or bypass them. Rows an older version stored
+ *    for `gateway:ai`, `gateway:video` or `gateway:mpesa` are left in place
+ *    but never read again (the catalog below is the allow-list).
  *  - Secrets are sealed at rest with the credentials vault (AES-256-GCM, bound
  *    to the organisation as AAD), never stored beside the non-secret config.
  *    Reads return a masked hint; only the action paths get the plaintext back,
  *    and only through resolveGateway().
  */
 
-export type GatewayKey = "ai" | "video" | "social" | "mpesa";
+export type GatewayKey = "social";
 
 export interface GatewayField {
   name: string;
@@ -33,45 +36,18 @@ export interface GatewayField {
 }
 
 export const GATEWAYS: Record<GatewayKey, { name: string; summary: string; fields: GatewayField[] }> = {
-  ai: {
-    name: "Text AI (chat, captions, replies)",
-    summary: "The model behind the Studio chat, WhatsApp auto-replies and captions.",
-    fields: [
-      { name: "provider", label: "Provider", secret: false, envHint: "AI_PROVIDER", placeholder: "anthropic or nvidia" },
-      { name: "apiKey", label: "API key", secret: true, envHint: "ANTHROPIC_API_KEY / NVIDIA_API_KEY", placeholder: "Stored sealed at rest; leave blank to keep the current one" },
-      { name: "model", label: "Chat model", secret: false, envHint: "AI_MODEL", placeholder: "e.g. claude-sonnet-5 or nvidia/nemotron-3-super" },
-      { name: "quickModel", label: "Quick model (one-line tasks)", secret: false, envHint: "AI_CHEAP_MODEL", placeholder: "e.g. claude-haiku-4-5" },
-    ],
-  },
-  video: {
-    name: "Video & image AI",
-    summary: "The gateway that renders ads, reels and product stories.",
-    fields: [
-      { name: "apiKey", label: "Higgsfield credentials", secret: true, envHint: "HF_CREDENTIALS (KEY_ID:KEY_SECRET)", placeholder: "KEY_ID:KEY_SECRET, sealed at rest" },
-    ],
-  },
   social: {
     name: "Social media (Meta)",
-    summary: "Facebook Pages, Instagram and WhatsApp Cloud API app credentials.",
+    summary: "Facebook Pages, Instagram and WhatsApp Cloud API app credentials — your own Meta app, if you bring one.",
     fields: [
       { name: "appId", label: "Meta app ID", secret: false, envHint: "META_APP_ID", placeholder: "e.g. 1234567890123456" },
       { name: "appSecret", label: "Meta app secret", secret: true, envHint: "META_APP_SECRET", placeholder: "Sealed at rest; leave blank to keep the current one" },
       { name: "webhookVerifyToken", label: "Webhook verify token", secret: true, envHint: "META_WEBHOOK_VERIFY_TOKEN", placeholder: "The string Meta echoes on registration" },
     ],
   },
-  mpesa: {
-    name: "M-Pesa (Daraja)",
-    summary: "STK push credentials for pay-per-image and pay-per-video.",
-    fields: [
-      { name: "consumerKey", label: "Consumer key", secret: false, envHint: "MPESA_CONSUMER_KEY", placeholder: "From the Daraja app" },
-      { name: "consumerSecret", label: "Consumer secret", secret: true, envHint: "MPESA_CONSUMER_SECRET", placeholder: "Sealed at rest" },
-      { name: "passkey", label: "Passkey", secret: true, envHint: "MPESA_PASSKEY", placeholder: "Sealed at rest" },
-      { name: "shortcode", label: "Shortcode", secret: false, envHint: "MPESA_SHORTCODE", placeholder: "e.g. 174379" },
-    ],
-  },
 };
 
-const SETTING_KEY: Record<GatewayKey, string> = { ai: "gateway:ai", video: "gateway:video", social: "gateway:social", mpesa: "gateway:mpesa" };
+const SETTING_KEY: Record<GatewayKey, string> = { social: "gateway:social" };
 
 interface StoredGateway {
   config: Record<string, string>;
@@ -95,17 +71,9 @@ async function readStored(organizationId: string, gateway: GatewayKey): Promise<
 function envDefault(gateway: GatewayKey, field: string): string | undefined {
   const e = env();
   const map: Record<string, string | undefined> = {
-    "ai.provider": configuredProviderName("AI") === "fixtures" ? undefined : configuredProviderName("AI"),
-    "ai.model": e.AI_MODEL,
-    "ai.quickModel": e.AI_CHEAP_MODEL,
-    "video.apiKey": e.HF_CREDENTIALS,
     "social.appId": e.META_APP_ID,
     "social.appSecret": e.META_APP_SECRET,
     "social.webhookVerifyToken": e.META_WEBHOOK_VERIFY_TOKEN,
-    "mpesa.consumerKey": e.MPESA_CONSUMER_KEY,
-    "mpesa.consumerSecret": e.MPESA_CONSUMER_SECRET,
-    "mpesa.passkey": e.MPESA_PASSKEY,
-    "mpesa.shortcode": e.MPESA_SHORTCODE,
   };
   return map[`${gateway}.${field}`];
 }
@@ -172,9 +140,14 @@ export async function gatewayStatus(organizationId: string | null): Promise<{ ga
  * Saves one gateway's settings. A blank secret keeps the stored one; "remove"
  * clears it. Secrets are sealed against the organisation, so a row lifted into
  * another org's setting cannot be decrypted.
+ *
+ * Anything but the social gateway is refused here as well as at the route —
+ * an agency must never be able to store AI, generation or payment credentials.
  */
 export async function saveGateway(organizationId: string, gateway: string, input: Record<string, unknown>) {
-  if (!isGatewayKey(gateway)) throw new Error("Unknown gateway.");
+  if (!isGatewayKey(gateway)) {
+    throw new ApiError(403, "FORBIDDEN", "AI, generation and payment credentials are managed by the platform, not by your agency. You can only manage your own social media app here.");
+  }
   const spec = GATEWAYS[gateway];
   if (!secretsAvailable()) throw new Error("CREDENTIALS_KEY is not set on the server, so credentials cannot be stored.");
 

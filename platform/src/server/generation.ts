@@ -345,7 +345,7 @@ export async function submitGeneration(assetId: string, finalAttempt: boolean): 
       return;
     }
     // What the platform will be charged, recorded as usage when the render completes.
-    // An organisation on its own key pays the provider itself, so nothing is recorded.
+    // Generation is platform-managed, so every finished render draws on the platform balance.
     const cost = provider.billedTo === "platform" && asset.providerMilliCredits === null ? await provider.estimate(asset.model, input, mode) : null;
     if (cost) {
       await db.generatedAsset.update({ where: { id: asset.id }, data: { providerMilliCredits: cost.milliCredits, providerUsdMicros: cost.usdMicros } });

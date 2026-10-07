@@ -5,7 +5,6 @@ import crypto from "node:crypto";
 import { env } from "@/lib/env";
 import { normaliseStatus, outputUrl, type GenerationMode, type RemoteStatus } from "@/lib/generation-models";
 import { providerName } from "@/lib/providers";
-import { resolveGateway } from "@/server/gateways";
 
 /**
  * Talks to the Higgsfield API (docs.higgsfield.ai): submit a request, then poll
@@ -220,34 +219,28 @@ export function generationProvider(): GenerationProvider {
 }
 
 /**
- * The provider for an organisation's generations: a key the Owner saved in
- * Settings runs ahead of the deployment's HF_CREDENTIALS, since the org pays
- * for its own renders.
+ * The provider for an organisation's generations: generation is platform-managed,
+ * so every organisation runs on the deployment's HF_CREDENTIALS. The
+ * organizationId stays in the signature for the callers and for metering; it no
+ * longer selects a key.
  */
 export async function generationProviderFor(organizationId: string): Promise<GenerationProvider> {
+  void organizationId;
   if (providerName("GENERATION") === "simulator") return simulator();
-  const org = await resolveGateway(organizationId, "video").catch(() => null);
-  const own = org?.apiKey?.includes(":") ? org.apiKey : null;
-  const credentials = own || env().HF_CREDENTIALS;
+  const credentials = env().HF_CREDENTIALS;
   if (!credentials || !credentials.includes(":")) {
-    throw new GenerationProviderError("Generation is not configured: set HF_CREDENTIALS, or save credentials in Settings.", false);
+    throw new GenerationProviderError("Generation is not configured: the platform admin sets HF_CREDENTIALS (console Deployment keys or the server .env).", false);
   }
-  return higgsfield(credentials, own ? "organization" : "platform");
+  return higgsfield(credentials, "platform");
 }
 
 /**
  * The provider an existing request belongs to, judged by its id. A request
- * started on the simulator is never re-checked against Higgsfield. The org's
- * own saved credentials run ahead of the deployment's, since the org pays for
- * its own renders.
+ * started on the simulator is never re-checked against Higgsfield. Generation
+ * is platform-managed: the deployment's credentials handle every request.
  */
 export async function providerForRequest(requestId: string, organizationId?: string): Promise<GenerationProvider> {
+  void organizationId;
   if (requestId.startsWith("sim_")) return simulator();
-  if (organizationId) {
-    const org = await resolveGateway(organizationId, "video").catch(() => null);
-    const own = org?.apiKey?.includes(":") ? org.apiKey : null;
-    const credentials = own || env().HF_CREDENTIALS;
-    if (credentials?.includes(":")) return higgsfield(credentials, own ? "organization" : "platform");
-  }
   return generationProvider();
 }

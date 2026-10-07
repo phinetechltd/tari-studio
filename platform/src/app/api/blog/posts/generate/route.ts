@@ -5,8 +5,8 @@ import { generateBlogDraft } from "@/server/blog";
 
 /**
  * Draft a post with AI. Uses the shared metered AI path (`ai:generate`, the
- * AI_CONTENT licence and the org's monthly allowance all apply), so an
- * organisation on its own key writes on its own model.
+ * AI_CONTENT licence and the org's monthly allowance all apply) on the
+ * platform's managed models.
  * The result is a draft only; nothing is saved until the editor does.
  */
 export const POST = handler({ permission: "ai:generate" }, async ({ principal, request }) => {

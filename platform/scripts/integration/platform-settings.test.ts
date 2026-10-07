@@ -46,13 +46,14 @@ describe("platform admin deployment settings", () => {
     assert.ok(!JSON.stringify(status).includes(key), "the status never carries the key");
   });
 
-  it("lets an agency's own key win for that agency only", async () => {
+  it("refuses an agency's own AI key: platform-managed AI only", async () => {
     const org = await makeOrg();
-    await saveGateway(org.id, "ai", { provider: "anthropic", apiKey: "sk-ant-api03-agency-own-key-5555" });
-    const own = await resolveGateway(org.id, "ai");
-    assert.equal(own.apiKey, "sk-ant-api03-agency-own-key-5555");
-    const other = await makeOrg();
-    assert.equal((await resolveGateway(other.id, "ai")).apiKey, undefined, "another agency falls back to the deployment key");
+    const denied = await rejection(() => saveGateway(org.id, "ai", { provider: "anthropic", apiKey: "sk-ant-api03-agency-own-key-5555" }));
+    assert.match(String((denied as Error).message), /managed by .*PRODUCT_NAME|managed by the platform|managed by/);
+    // A row an older version stored is left in place but never honoured again:
+    // resolveGateway no longer knows the "ai" gateway, so nothing reads it.
+    const own = await db.setting.findFirst({ where: { organizationId: org.id, key: "gateway:ai" } });
+    assert.equal(own, null, "no new agency AI row may be written");
   });
 
   it("keeps a secret when the field is left blank, and falls back to the .env when it is removed", async () => {
