@@ -11,6 +11,7 @@ import {
   STAGE_LABELS,
   STAGES,
   TRIGGER_LABELS,
+  TEXT_TRIGGERS,
   TRIGGERS,
   type Action,
   type ActionType,
@@ -136,8 +137,8 @@ function describeAction(a: Action): string {
 
 function summary(a: AutomationView): string {
   const when =
-    a.trigger === "MESSAGE_RECEIVED" && a.conditions?.match === "keywords"
-      ? `A message mentions ${(a.conditions.keywords ?? []).map((k) => `“${k}”`).join(", ")}`
+    TEXT_TRIGGERS.has(a.trigger as Trigger) && a.conditions?.match === "keywords"
+      ? `A ${a.trigger === "COMMENT_RECEIVED" ? "TikTok comment" : "message"} mentions ${(a.conditions.keywords ?? []).map((k) => `“${k}”`).join(", ")}`
       : TRIGGER_LABELS[a.trigger as Trigger] ?? a.trigger;
   return `${when} → ${a.actions.map(describeAction).join(", then ")}`;
 }
@@ -164,7 +165,7 @@ export function AutomationsApp(props: {
       brandId: draft.brandId || null,
       trigger: draft.trigger,
       conditions: {
-        match: draft.trigger === "MESSAGE_RECEIVED" ? draft.match : "any",
+        match: TEXT_TRIGGERS.has(draft.trigger) ? draft.match : "any",
         keywords: draft.keywords.split(",").map((k) => k.trim()).filter(Boolean),
       },
       actions: draft.actions.filter((a) => allowed.includes(a.type)),
@@ -279,15 +280,15 @@ export function AutomationsApp(props: {
             </select>
           </div>
 
-          {draft.trigger === "MESSAGE_RECEIVED" ? (
+          {TEXT_TRIGGERS.has(draft.trigger) ? (
             <fieldset className="space-y-2">
               <legend className="label">Only if</legend>
               <div className="flex flex-wrap gap-4 text-sm">
                 <label className="flex items-center gap-2">
-                  <input type="radio" name="match" checked={draft.match === "any"} onChange={() => setDraft({ ...draft, match: "any" })} /> Any message
+                  <input type="radio" name="match" checked={draft.match === "any"} onChange={() => setDraft({ ...draft, match: "any" })} /> {draft.trigger === "COMMENT_RECEIVED" ? "Any comment" : "Any message"}
                 </label>
                 <label className="flex items-center gap-2">
-                  <input type="radio" name="match" checked={draft.match === "keywords"} onChange={() => setDraft({ ...draft, match: "keywords" })} /> The message mentions a keyword
+                  <input type="radio" name="match" checked={draft.match === "keywords"} onChange={() => setDraft({ ...draft, match: "keywords" })} /> The {draft.trigger === "COMMENT_RECEIVED" ? "comment" : "message"} mentions a keyword
                 </label>
               </div>
               {draft.match === "keywords" ? (

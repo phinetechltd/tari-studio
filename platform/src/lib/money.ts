@@ -34,6 +34,18 @@ export function formatMoney(
 export const formatKES = (cents: number, opts?: { decimals?: boolean }): string =>
   formatMoney(cents, "KES", opts);
 
+/**
+ * "1,250.50" or "1250" typed by a person into whole minor units, without floating point.
+ * Returns null for an empty box (no price) and undefined for anything that is not an amount.
+ */
+export function parseAmountToCents(input: string): number | null | undefined {
+  const t = input.replace(/[,\s]/g, "");
+  if (t === "") return null;
+  const m = /^(\d{1,9})(?:\.(\d{1,2}))?$/.exec(t);
+  if (!m) return undefined;
+  return Number(m[1]) * 100 + Number((m[2] ?? "").padEnd(2, "0") || "0");
+}
+
 /** Sum of integer cents, refusing anything that is not a safe integer. */
 export function sumCents(values: ReadonlyArray<number>): number {
   let total = 0;

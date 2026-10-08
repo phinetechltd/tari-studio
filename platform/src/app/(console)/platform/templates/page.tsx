@@ -2,9 +2,11 @@ import { Plus } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { Badge, EmptyState, PageHeader } from "@/components/ui";
+import { Badge, EmptyState, PageHeader, SectionTitle, TableWrap } from "@/components/ui";
 import { requirePlatform } from "@/lib/session";
-import { listAll } from "@/server/templates";
+import { listAll, listShared } from "@/server/templates";
+
+import { ModerateButton } from "./moderate-button";
 
 export const metadata: Metadata = { title: "Templates" };
 export const dynamic = "force-dynamic";
@@ -12,7 +14,7 @@ export const dynamic = "force-dynamic";
 /** Templates you publish for every agency: a description and an image pack each. */
 export default async function PlatformTemplatesPage() {
   await requirePlatform();
-  const templates = await listAll();
+  const [templates, shared] = await Promise.all([listAll(), listShared()]);
   return (
     <>
       <PageHeader
@@ -57,6 +59,53 @@ export default async function PlatformTemplatesPage() {
           ))}
         </ul>
       )}
+
+      <section className="mt-12" aria-labelledby="shared">
+        <SectionTitle id="shared">Shared by organisations ({shared.length})</SectionTitle>
+        <p className="-mt-2 mb-4 max-w-3xl text-sm text-muted">
+          Public templates organisations made for everyone. They go live when published; hide any that are inappropriate or use pictures that are not theirs. A hidden template stays usable by the organisation that made it, which sees your reason.
+        </p>
+        {shared.length === 0 ? (
+          <EmptyState title="Nothing shared yet">Public templates from organisations appear here.</EmptyState>
+        ) : (
+          <TableWrap>
+            <table className="w-full min-w-[760px] text-sm">
+              <thead>
+                <tr className="border-b border-line text-left text-muted">
+                  <th className="px-4 py-2 font-medium">Template</th>
+                  <th className="px-4 py-2 font-medium">Organisation</th>
+                  <th className="px-4 py-2 text-right font-medium">Images</th>
+                  <th className="px-4 py-2 font-medium">State</th>
+                  <th className="px-4 py-2" />
+                </tr>
+              </thead>
+              <tbody>
+                {shared.map((t) => (
+                  <tr key={t.id} className="border-b border-line last:border-0">
+                    <td className="px-4 py-2">
+                      <div className="flex items-center gap-3">
+                        {t.cover ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={t.cover} alt="" className="h-10 w-10 rounded-lg object-cover" loading="lazy" />
+                        ) : null}
+                        <Link href={`/platform/templates/${t.id}`} className="font-medium text-primary underline-offset-2 hover:underline">
+                          {t.title}
+                        </Link>
+                      </div>
+                    </td>
+                    <td className="px-4 py-2 text-muted">{t.organizationName ?? "—"}</td>
+                    <td className="px-4 py-2 text-right tabular-nums">{t.imageCount}</td>
+                    <td className="px-4 py-2">{t.hidden ? <Badge tone="danger">Hidden</Badge> : <Badge tone="success">Shared</Badge>}</td>
+                    <td className="px-4 py-2 text-right">
+                      <ModerateButton id={t.id} hidden={t.hidden} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableWrap>
+        )}
+      </section>
     </>
   );
 }

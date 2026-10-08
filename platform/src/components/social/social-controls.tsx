@@ -2,10 +2,14 @@
 
 import { CalendarClock, ImageIcon, RefreshCw, Send, Sparkles, Unplug, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
+import { AiSuggestionBar, useImageAutofill } from "@/components/ai/autofill";
 import { callApi } from "@/components/json-form";
+import type { TikTokOptions } from "@/lib/tiktok";
 import { cn } from "@/lib/utils";
+
+import { TikTokPostOptions } from "./tiktok-controls";
 
 export function ChannelActions({ channelId, canDisconnect }: { channelId: string; canDisconnect: boolean }) {
   const router = useRouter();
@@ -77,6 +81,12 @@ export function PostActions({ postId, status }: { postId: string; status: string
   );
 }
 
+const SHORT: Record<string, { tag: string; className: string; name: string }> = {
+  INSTAGRAM: { tag: "IG", className: "text-[#ff7ab6]", name: "Instagram" },
+  FACEBOOK: { tag: "FB", className: "text-[#6ea8ff]", name: "Facebook" },
+  TIKTOK: { tag: "TT", className: "text-ink", name: "TikTok" },
+};
+
 interface ComposerProps {
   channels: Array<{ id: string; name: string; platform: string; brandId: string; brandName: string }>;
   assets: Array<{ id: string; mediaType: string; prompt: string }>;
@@ -103,12 +113,35 @@ export function Composer(props: ComposerProps) {
   const [drafting, setDrafting] = useState(false);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const [tiktok, setTiktok] = useState<Partial<TikTokOptions>>({});
 
   const chosen = props.channels.filter((c) => selected.includes(c.id));
   const brandId = chosen[0]?.brandId ?? props.channels[0]?.brandId ?? null;
-  const needsMedia = chosen.some((c) => c.platform === "INSTAGRAM") && !assetId;
+  const needsMedia = chosen.some((c) => c.platform === "INSTAGRAM" || c.platform === "TIKTOK") && !assetId;
+  const tiktokChannel = chosen.find((c) => c.platform === "TIKTOK") ?? null;
   const asset = props.assets.find((a) => a.id === assetId) ?? null;
   const campaigns = useMemo(() => props.campaigns.filter((c) => !brandId || c.brandId === brandId), [props.campaigns, brandId]);
+
+  // Image → caption: picking an image asset fills an empty caption automatically.
+  // Never overwrites what was typed; the suggestion arrives as an editable chip.
+  const autofill = useImageAutofill({
+    formKind: "post",
+    getFields: () => ({ caption: text }),
+    getAssetId: () => assetId,
+    brandId: () => brandId,
+    onApply: (_field, value) => setText(value),
+  });
+
+  useEffect(() => {
+    if (!assetId) {
+      autofill.reset();
+      return;
+    }
+    const picked = props.assets.find((a) => a.id === assetId);
+    if (picked && picked.mediaType === "IMAGE" && !text.trim() && props.canUseAi) void autofill.run();
+    // Values are read fresh at call time; re-running on every render is not wanted.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assetId]);
 
   const draftWithAi = async () => {
     if (!brandId || !brief.trim()) return setMessage({ ok: false, text: "Pick a channel and describe the post first." });
@@ -125,6 +158,7 @@ export function Composer(props: ComposerProps) {
     setMessage(null);
     if (selected.length === 0) return setMessage({ ok: false, text: "Choose at least one Page or account." });
     if (when === "later" && !at) return setMessage({ ok: false, text: "Choose when to publish." });
+    if (tiktokChannel && !tiktok.privacyLevel) return setMessage({ ok: false, text: "Choose who can see the TikTok post." });
     setPending(true);
     const r = await callApi<{ posts: unknown[] }>("/api/posts", "POST", {
       channelIds: selected,
@@ -133,6 +167,7 @@ export function Composer(props: ComposerProps) {
       link: link || null,
       campaignId: campaignId || null,
       scheduledAt: when === "later" ? nairobiInstant(at) : null,
+      ...(tiktokChannel ? { tiktok: { allowComments: false, allowDuet: false, allowStitch: false, brandedContent: false, yourBrand: false, ...tiktok } } : {}),
     });
     setPending(false);
     if (!r.ok) return setMessage({ ok: false, text: r.error?.message ?? "Not scheduled." });
@@ -141,7 +176,8 @@ export function Composer(props: ComposerProps) {
     setAssetId(null);
     setLink("");
     setSelected([]);
-    setMessage({ ok: true, text: when === "now" ? "Queued. It goes out within a few seconds." : "Scheduled." });
+    setTiktok({});
+    setMessage({ ok: true, text: when === "now" ? (tiktokChannel ? "Queued. TikTok takes a minute or two to process it." : "Queued. It goes out within a few seconds.") : "Scheduled." });
     router.refresh();
   };
 
@@ -159,23 +195,22 @@ export function Composer(props: ComposerProps) {
           {props.channels.map((c) => {
             const on = selected.includes(c.id);
             const otherBrand = chosen.length > 0 && chosen[0]!.brandId !== c.brandId;
+            const secondTikTok = c.platform === "TIKTOK" && !on && chosen.some((x) => x.platform === "TIKTOK");
             return (
               <button
                 key={c.id}
                 type="button"
-                disabled={otherBrand && !on}
+                disabled={(otherBrand && !on) || secondTikTok}
                 onClick={() => setSelected((s) => (on ? s.filter((x) => x !== c.id) : [...s, c.id]))}
                 aria-pressed={on}
-                aria-label={`${c.platform === "INSTAGRAM" ? "Instagram" : "Facebook"}: ${c.name} (${c.brandName})`}
-                title={otherBrand && !on ? "One brand per post" : c.brandName}
+                aria-label={`${SHORT[c.platform]?.name ?? c.platform}: ${c.name} (${c.brandName})`}
+                title={otherBrand && !on ? "One brand per post" : secondTikTok ? "One TikTok account per post" : c.brandName}
                 className={cn(
                   "rounded-full border px-3 py-1.5 text-sm transition-colors disabled:opacity-40",
                   on ? "border-primary bg-primary/15 text-ink" : "border-line text-ink/80 hover:bg-wash/[0.05]",
                 )}
               >
-                <span className={cn("mr-1.5 text-[10px] font-bold", c.platform === "INSTAGRAM" ? "text-[#ff7ab6]" : "text-[#6ea8ff]")}>
-                  {c.platform === "INSTAGRAM" ? "IG" : "FB"}
-                </span>
+                <span className={cn("mr-1.5 text-[10px] font-bold", SHORT[c.platform]?.className ?? "text-muted")}>{SHORT[c.platform]?.tag ?? c.platform.slice(0, 2)}</span>
                 {c.name}
               </button>
             );
@@ -203,7 +238,22 @@ export function Composer(props: ComposerProps) {
         </label>
         <textarea id="caption" value={text} onChange={(e) => setText(e.target.value)} rows={5} maxLength={2200} className="input py-2.5" placeholder="What the post says" />
         <p className="mt-1 text-right text-[11px] text-muted">{text.length} / 2,200</p>
+        {props.canUseAi ? (
+          <div className="mt-2">
+            <AiSuggestionBar
+              suggestions={autofill.suggestions}
+              busy={autofill.busy}
+              quietReason={autofill.quietReason}
+              onApply={autofill.apply}
+              onApplyAll={autofill.applyAll}
+              onRegenerate={() => void autofill.run()}
+              onDismiss={autofill.reset}
+            />
+          </div>
+        ) : null}
       </div>
+
+      {tiktokChannel ? <TikTokPostOptions channelId={tiktokChannel.id} value={tiktok} onChange={setTiktok} /> : null}
 
       <div className="grid gap-4 md:grid-cols-2">
         <div>
@@ -225,7 +275,7 @@ export function Composer(props: ComposerProps) {
               <ImageIcon className="h-4 w-4" /> Choose from the library
             </button>
           )}
-          {needsMedia ? <p className="mt-1 text-xs text-warning">Instagram needs an image or a video.</p> : null}
+          {needsMedia ? <p className="mt-1 text-xs text-warning">{tiktokChannel ? "TikTok" : "Instagram"} needs an image or a video.</p> : null}
         </div>
         <div className="space-y-3">
           <div>

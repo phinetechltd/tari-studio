@@ -25,6 +25,8 @@ export const MODULE_KEYS = [
   "INSTALLATIONS",
   "SUPPORT_DESK",
   "CUSTOMER_INSIGHTS",
+  "PRODUCTS",
+  "AUTOPILOT",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -141,6 +143,24 @@ export const MODULE_CATALOG: Record<ModuleKey, ModuleDefinition> = {
     comingSoon: true,
     release: "R5",
     icon: "lightbulb",
+  },
+  PRODUCTS: {
+    key: "PRODUCTS",
+    name: "Products",
+    summary: "Your products with pictures, details and optional stock counts, ready to use in the Studio.",
+    requires: [],
+    comingSoon: false,
+    release: "R2",
+    icon: "package",
+  },
+  AUTOPILOT: {
+    key: "AUTOPILOT",
+    name: "Autopilot",
+    summary: "Makes content on a schedule and posts it, or holds it for your approval first.",
+    requires: ["SOCIAL_PUBLISHING", "AI_CONTENT"],
+    comingSoon: false,
+    release: "R2",
+    icon: "repeat",
   },
 };
 

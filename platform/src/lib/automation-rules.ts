@@ -6,15 +6,19 @@ import { z } from "zod";
  * engine in src/server/automations.ts (evaluation).
  */
 
-export const TRIGGERS = ["MESSAGE_RECEIVED", "LEAD_CREATED", "POST_PUBLISHED", "POST_FAILED"] as const;
+export const TRIGGERS = ["MESSAGE_RECEIVED", "LEAD_CREATED", "COMMENT_RECEIVED", "POST_PUBLISHED", "POST_FAILED"] as const;
 export type Trigger = (typeof TRIGGERS)[number];
 
 export const TRIGGER_LABELS: Record<Trigger, string> = {
   MESSAGE_RECEIVED: "A WhatsApp message arrives",
   LEAD_CREATED: "A new contact messages for the first time",
-  POST_PUBLISHED: "A scheduled post is published",
+  COMMENT_RECEIVED: "Someone comments on a TikTok video",
+  POST_PUBLISHED: "A scheduled post is published (Facebook, Instagram or TikTok)",
   POST_FAILED: "A scheduled post fails to publish",
 };
+
+/** Triggers whose conditions can match keywords in the incoming text. */
+export const TEXT_TRIGGERS: ReadonlySet<Trigger> = new Set(["MESSAGE_RECEIVED", "COMMENT_RECEIVED"]);
 
 export const STAGES = ["NEW", "CONTACTED", "QUALIFIED", "WON", "LOST"] as const;
 export type Stage = (typeof STAGES)[number];
@@ -40,21 +44,22 @@ export type Action = z.infer<typeof ActionSchema>;
 export type ActionType = Action["type"];
 
 export const ACTION_LABELS: Record<ActionType, string> = {
-  SEND_REPLY: "Send a WhatsApp reply",
+  SEND_REPLY: "Send a reply (WhatsApp message, or a reply to the TikTok comment)",
   AI_REPLY: "Reply with AI (uses the brand's catalogue)",
   SET_STAGE: "Move the lead to a stage",
   ADD_TAG: "Tag the contact",
   NOTIFY_TEAM: "Notify the team",
 };
 
-/** Actions that need a conversation to act on. Post events have none. */
+/** Actions that need a WhatsApp contact to act on. Post events have none; a TikTok comment can be replied to, but has no contact. */
 const CONVERSATION_ACTIONS: ReadonlySet<ActionType> = new Set(["SEND_REPLY", "AI_REPLY", "SET_STAGE", "ADD_TAG"]);
+const CONTACT_ACTIONS: ReadonlySet<ActionType> = new Set(["SET_STAGE", "ADD_TAG"]);
 
 export function actionsAllowedFor(trigger: Trigger): ActionType[] {
   const all = Object.keys(ACTION_LABELS) as ActionType[];
-  return trigger === "POST_PUBLISHED" || trigger === "POST_FAILED"
-    ? all.filter((a) => !CONVERSATION_ACTIONS.has(a))
-    : all;
+  if (trigger === "POST_PUBLISHED" || trigger === "POST_FAILED") return all.filter((a) => !CONVERSATION_ACTIONS.has(a));
+  if (trigger === "COMMENT_RECEIVED") return all.filter((a) => !CONTACT_ACTIONS.has(a));
+  return all;
 }
 
 export const MessageConditionsSchema = z.object({
@@ -78,7 +83,7 @@ export const AutomationInputSchema = z
         ctx.addIssue({
           code: z.ZodIssueCode.custom,
           path: ["actions", i, "type"],
-          message: `"${ACTION_LABELS[a.type]}" needs a WhatsApp conversation, which "${TRIGGER_LABELS[value.trigger]}" does not have.`,
+          message: `"${ACTION_LABELS[a.type]}" needs ${CONTACT_ACTIONS.has(a.type) ? "a WhatsApp contact" : "a message or comment to answer"}, which "${TRIGGER_LABELS[value.trigger]}" does not have.`,
         });
       }
     });

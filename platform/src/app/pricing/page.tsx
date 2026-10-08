@@ -4,21 +4,27 @@ import Link from "next/link";
 
 import { SiteFooter, SiteHeader } from "@/components/landing/site-chrome";
 import { PlanGrid } from "@/components/pricing/plan-grid";
+import { JsonLd } from "@/components/seo/json-ld";
 import { PRODUCT_NAME } from "@/lib/brand";
 import { formatKES } from "@/lib/money";
 import { creditsBuy, creditsToCents, maxAnnualSavingPercent, PAID_PLAN_KEYS, videoCreditsFor } from "@/lib/pricing";
 import { faqFor } from "@/lib/showcase";
+import { absoluteUrl, breadcrumbLd, faqLd, pageMetadata, softwareApplicationLd } from "@/lib/seo";
 import { getPricing } from "@/server/pricing-store";
+import { siteSeo } from "@/server/seo";
 
 /** Prices come from the admin's price list, so the page is rendered per request. */
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
-  const { plans } = await getPricing();
-  return {
+  const [{ plans }, site] = await Promise.all([getPricing(), siteSeo()]);
+  return pageMetadata({
     title: "Pricing",
     description: `${PRODUCT_NAME} plans in Kenyan shillings: Free, Basic ${formatKES(plans.BASIC.monthlyCents)}, Pro ${formatKES(plans.PRO.monthlyCents)} and Max ${formatKES(plans.MAX.monthlyCents)} a month, cheaper yearly. Pay by M-Pesa or card.`,
-  };
+    path: "/pricing",
+    siteName: PRODUCT_NAME,
+    noindex: !site.indexable,
+  });
 }
 
 /** Credits per KES 100 spent: the "how far does a shilling go" row. */
@@ -56,9 +62,29 @@ export default async function PricingPage() {
     { label: "Pay by card (Paystack)", values: [true, true, true, true] },
     { label: "Renews itself when paid by card", values: [false, true, true, true] },
   ];
+  const site = await siteSeo();
+  const structuredData = [
+    breadcrumbLd(site.base, [
+      { name: PRODUCT_NAME, path: "/" },
+      { name: "Pricing", path: "/pricing" },
+    ]),
+    softwareApplicationLd({
+      name: PRODUCT_NAME,
+      url: site.base,
+      description: `AI video and image ads, publishing and WhatsApp replies for African brands, priced in Kenyan shillings.`,
+      image: absoluteUrl(site.base, "/showcase/showreel.jpg"),
+      offers: [
+        { name: "Free", monthlyCents: 0, description: "Top up credits as you go" },
+        ...PAID_PLAN_KEYS.map((k) => ({ name: k.charAt(0) + k.slice(1).toLowerCase(), monthlyCents: pricing.plans[k].monthlyCents, description: `${pricing.plans[k].creditsPerMonth.toLocaleString("en-KE")} credits a month` })),
+      ],
+    }),
+    // Only the questions this page shows: structured data must match the visible page.
+    faqLd(faqFor(pricing).slice(0, 4).map((f) => ({ q: f.q, a: f.a }))),
+  ];
 
   return (
     <div className="theme-afro theme-afro-night min-h-screen bg-bg text-ink">
+      <JsonLd data={structuredData} />
       <SiteHeader />
       <main>
         <section className="relative overflow-hidden px-4 pb-10 pt-20 sm:px-6">

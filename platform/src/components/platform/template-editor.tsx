@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 
 import { callApi } from "@/components/landing/order-events";
+import { INPUT_IMAGE_HELP } from "@/lib/generation-models";
 
 export interface TemplateValues {
   id?: string;
@@ -166,7 +167,7 @@ export function TemplateEditor({ initial }: { initial: TemplateValues }) {
               <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" disabled={busy !== null} onChange={(e) => void upload(e.target.files)} />
             </label>
           </div>
-          <p className="mt-1 text-xs text-muted">PNG, JPEG or WebP, up to 10 MB each. The first image is the cover.</p>
+          <p className="mt-1 text-xs text-muted">{INPUT_IMAGE_HELP} The first image is the cover.</p>
           {v.images.length === 0 ? (
             <p className="mt-4 text-sm text-muted">No images yet. A template needs at least one before it can be published.</p>
           ) : (

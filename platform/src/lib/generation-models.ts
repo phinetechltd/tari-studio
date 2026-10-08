@@ -68,6 +68,47 @@ export const MODES: Record<GenerationMode, ModeSpec> = {
   },
 };
 
+/**
+ * Rules for images people upload (characters, products, brand art, template packs) that can
+ * become the first frame of a generation. Higgsfield documents the accepted types
+ * (JPEG, PNG, WebP, GIF) and a presigned-upload flow, but publishes no maximum size or
+ * dimensions, so these limits are ours: conservative, and in this one place to change.
+ */
+export const INPUT_IMAGE_LIMITS = {
+  maxBytes: 10 * 1024 * 1024,
+  /** Shortest and longest side, in pixels */
+  minSide: 300,
+  maxSide: 4096,
+  /** Larger images are scaled down to this before they are sent to Higgsfield */
+  sendMaxSide: 2048,
+  /** GIF is accepted by Higgsfield but we keep to still-photo formats */
+  formats: ["image/jpeg", "image/png", "image/webp"],
+  /** Pictures kept per product or character */
+  perItem: 6,
+} as const;
+
+export const INPUT_IMAGE_HELP = `PNG, JPEG or WebP, up to ${INPUT_IMAGE_LIMITS.maxBytes / 1024 / 1024} MB, at least ${INPUT_IMAGE_LIMITS.minSide} px and at most ${INPUT_IMAGE_LIMITS.maxSide} px on the longest side.`;
+
+/** Why an image of this size is refused, or null when it is fine. */
+export function imageSizeProblem(width: number, height: number): string | null {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return "That image could not be read.";
+  if (Math.min(width, height) < INPUT_IMAGE_LIMITS.minSide) {
+    return `That image is too small (${width}×${height}). Use one at least ${INPUT_IMAGE_LIMITS.minSide} px on its short side.`;
+  }
+  if (Math.max(width, height) > INPUT_IMAGE_LIMITS.maxSide) {
+    return `That image is too large (${width}×${height}). Use one no more than ${INPUT_IMAGE_LIMITS.maxSide} px on its long side.`;
+  }
+  return null;
+}
+
+/** The size an image is sent at: unchanged, or scaled down so its long side is at most `sendMaxSide`. */
+export function sendSize(width: number, height: number): { width: number; height: number } {
+  const longest = Math.max(width, height);
+  if (longest <= INPUT_IMAGE_LIMITS.sendMaxSide) return { width, height };
+  const k = INPUT_IMAGE_LIMITS.sendMaxSide / longest;
+  return { width: Math.max(1, Math.round(width * k)), height: Math.max(1, Math.round(height * k)) };
+}
+
 export function isAspectRatio(v: unknown): v is AspectRatio {
   return typeof v === "string" && (ASPECT_RATIOS as readonly string[]).includes(v);
 }
@@ -131,6 +172,15 @@ export const FAMILIES: Record<ModelFamily, FamilySpec> = {
   },
   hailuo: { name: "Hailuo", media: "VIDEO", modes: ["video", "animate"], seconds: { choices: [6, 10] }, aspects: null, resolution: "768p", sound: false },
 };
+
+/**
+ * Whether a family can start from a picture (image-to-video, `image_url`). Higgsfield's
+ * text-to-image endpoint (Soul) has no reference-image input in its public schema, so
+ * for images the brand, product, character and template reach the model as words only.
+ */
+export function supportsStartImage(family: ModelFamily): boolean {
+  return FAMILIES[family].modes.includes("animate");
+}
 
 export function isModelFamily(v: unknown): v is ModelFamily {
   return typeof v === "string" && (MODEL_FAMILIES as readonly string[]).includes(v);

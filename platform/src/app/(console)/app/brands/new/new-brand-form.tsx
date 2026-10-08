@@ -18,6 +18,7 @@ export function NewBrandForm() {
     const data = {
       name: (form.elements.namedItem("name") as HTMLInputElement)?.value?.trim() || "",
       avatarUrl: (form.elements.namedItem("avatarUrl") as HTMLInputElement)?.value?.trim() || undefined,
+      slogan: (form.elements.namedItem("slogan") as HTMLInputElement)?.value?.trim() || undefined,
       contactName: (form.elements.namedItem("contactName") as HTMLInputElement)?.value?.trim() || undefined,
       contactEmail: (form.elements.namedItem("contactEmail") as HTMLInputElement)?.value?.trim() || undefined,
       contactPhone: (form.elements.namedItem("contactPhone") as HTMLInputElement)?.value?.trim() || undefined,
@@ -41,7 +42,10 @@ export function NewBrandForm() {
     setPending(false);
 
     if (res.ok) {
-      router.push("/app/brands");
+      // Straight on to the profile (cover picture, logo, files): brands with a complete profile make better content.
+      const json = (await res.json().catch(() => null)) as { data?: { brand?: { id?: string } } } | null;
+      const id = json?.data?.brand?.id;
+      router.push(id ? `/app/brands/${id}/edit?new=1` : "/app/brands");
       router.refresh();
     } else {
       const json = await res.json().catch(() => ({}));
@@ -66,6 +70,14 @@ export function NewBrandForm() {
             placeholder="e.g. Safaricom"
             autoFocus
           />
+        </div>
+
+        <div>
+          <label className="mb-1 block text-sm font-medium" htmlFor="slogan">
+            Slogan
+          </label>
+          <input id="slogan" name="slogan" maxLength={160} className="input" placeholder="e.g. Fresh from the farm, every day" />
+          <p className="mt-1 text-xs text-muted">Optional. A short line the brand is known for. Captions and videos use it.</p>
         </div>
 
         <div>

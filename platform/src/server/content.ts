@@ -112,7 +112,7 @@ export async function getTask(principal: Principal, taskId: string) {
 export async function updateTask(
   principal: Principal,
   taskId: string,
-  updates: Partial<{ title: string; description: string; status: string; priority: string; dueAt: Date; assigneeId: string; targetPlatform: string }>,
+  updates: Partial<{ title: string; description: string; status: string; priority: string; dueAt: Date | null; assigneeId: string | null; targetPlatform: string }>,
 ) {
   const existing = await db.contentTask.findUnique({ where: { id: taskId }, select: { id: true, organizationId: true } });
   if (!existing) throw new ApiError(404, "NOT_FOUND", "Task not found.");
@@ -125,11 +125,32 @@ export async function updateTask(
       description: updates.description ?? undefined,
       status: updates.status ?? undefined,
       priority: updates.priority ?? undefined,
-      dueAt: updates.dueAt ?? undefined,
-      assigneeId: updates.assigneeId ?? undefined,
+      dueAt: updates.dueAt === undefined ? undefined : updates.dueAt,
+      assigneeId: updates.assigneeId === undefined ? undefined : updates.assigneeId,
       targetPlatform: updates.targetPlatform ?? undefined,
     },
   });
+}
+
+/** Soft delete: archived tasks leave the board but keep their history for the record. */
+export async function archiveTask(principal: Principal, taskId: string, request?: Request) {
+  const existing = await db.contentTask.findUnique({ where: { id: taskId }, select: { id: true, organizationId: true, status: true } });
+  if (!existing) throw new ApiError(404, "NOT_FOUND", "Task not found.");
+  if (existing.organizationId !== principal.organizationId) throw new ApiError(403, "FORBIDDEN", "Not your task.");
+
+  const task = await db.contentTask.update({ where: { id: taskId }, data: { status: "ARCHIVED" } });
+
+  await audit({
+    organizationId: principal.organizationId,
+    userId: principal.userId,
+    action: "ARCHIVE",
+    entity: "ContentTask",
+    entityId: taskId,
+    changes: { from: existing.status, to: "ARCHIVED" },
+    request,
+  });
+
+  return task;
 }
 
 export async function createSubmission(principal: Principal, input: {

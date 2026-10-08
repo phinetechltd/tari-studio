@@ -33,6 +33,11 @@ const PUBLIC_ALLOWLIST = new Set([
   // Google sign-in: state, nonce and PKCE are checked on return (src/server/oauth-google.ts).
   "api/auth/google/start",
   "api/auth/google/callback",
+  // TikTok sign-in (Login Kit): signed state + PKCE; a new identity only ever earns a
+  // pending ticket — the account is created after a verified email (src/server/oauth-tiktok.ts).
+  "api/auth/tiktok/start",
+  "api/auth/tiktok/callback",
+  "api/auth/tiktok/complete",
   "api/auth/invite",
   "api/health",
   // Public ordering from the landing page. Guarded by rate limits per phone,
@@ -49,6 +54,8 @@ const PUBLIC_ALLOWLIST = new Set([
   // Paystack's webhook: every POST must carry a valid x-paystack-signature, and
   // then only triggers a verify by reference (src/server/payments.ts).
   "api/webhooks/paystack",
+  "api/webhooks/tiktok",
+  "og",
   // The Paystack simulator's checkout: refused unless PAYSTACK_PROVIDER=simulator
   // outside production; it records a pretend outcome and triggers a verify.
   "api/payments/paystack/simulator",

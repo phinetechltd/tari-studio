@@ -19,6 +19,7 @@
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
     "db:seed": "tsx --tsconfig scripts/tsconfig.json prisma/seed.ts",
+    "admin:create": "tsx --tsconfig scripts/tsconfig.json scripts/create-admin.ts",
     "db:reset": "prisma migrate reset --force",
     "db:studio": "prisma studio",
     "test:unit": "tsx --tsconfig scripts/tsconfig.json --test \"src/**/*.test.ts\"",
@@ -33,6 +34,9 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.128.0",
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@higgsfield/client": "^0.2.6",
     "@prisma/client": "^6.2.1",
     "bcryptjs": "^2.4.3",
@@ -48,6 +52,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "server-only": "^0.0.1",
+    "sharp": "^0.35.4",
     "tailwind-merge": "^2.6.1",
     "three": "^0.170.0",
     "zod": "^3.24.1"

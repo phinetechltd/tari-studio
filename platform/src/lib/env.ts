@@ -86,7 +86,31 @@ const schema = z.object({
   PAYSTACK_PROVIDER: z.enum(["simulator", "paystack", "off"]).default("simulator"),
   /** sk_live_… or sk_test_…; also the key that signs Paystack's webhooks */
   PAYSTACK_SECRET_KEY: z.string().optional(),
+  /** pk_live_… / pk_test_… — Paystack's public key, for card fields embedded in our pages */
+  PAYSTACK_PUBLIC_KEY: z.string().optional(),
   /** Image and video generation. "simulator" returns sample media; production refuses it. */
+  /**
+   * TikTok: Login Kit + Content Posting API (developers.tiktok.com) for posting,
+   * and optionally the TikTok API for Business (business-api.tiktok.com) for
+   * reading and answering comments. "simulator" pretends (production refuses it).
+   */
+  TIKTOK_PROVIDER: z.enum(["simulator", "live", "off"]).default("simulator"),
+  TIKTOK_CLIENT_KEY: z.string().optional(),
+  TIKTOK_CLIENT_SECRET: z.string().optional(),
+  TIKTOK_BUSINESS_APP_ID: z.string().optional(),
+  TIKTOK_BUSINESS_SECRET: z.string().optional(),
+  /** Pinterest API v5: an organisation's own pins and boards as template sources. */
+  PINTEREST_PROVIDER: z.enum(["simulator", "live", "off"]).default("simulator"),
+  PINTEREST_APP_ID: z.string().optional(),
+  PINTEREST_APP_SECRET: z.string().optional(),
+  /** "on" once Pinterest grants the app partner search (searching all of Pinterest, not just your own pins) */
+  PINTEREST_PARTNER_SEARCH: z.enum(["on", "off"]).default("off"),
+  /** Google Search Console "HTML tag" verification code (the content="…" value only) */
+  GOOGLE_SITE_VERIFICATION: z.string().max(200).optional(),
+  /** Bing Webmaster Tools verification code (msvalidate.01) */
+  BING_SITE_VERIFICATION: z.string().max(200).optional(),
+  /** The product's official social profiles, comma-separated URLs (search engines link them to the site) */
+  SEO_SOCIAL_PROFILES: z.string().max(2000).optional(),
   GENERATION_PROVIDER: z.enum(["simulator", "higgsfield"]).default("simulator"),
   /** Higgsfield API credentials, "KEY_ID:KEY_SECRET" */
   HF_CREDENTIALS: z.string().optional(),
@@ -94,6 +118,8 @@ const schema = z.object({
   STORAGE_DIR: z.string().default("storage"),
   /** The organisation that owns public orders from the landing page (the operator's own agency) */
   ORDERS_ORGANIZATION_SLUG: z.string().default("demo-agency"),
+  /** The organisation whose published posts appear on the public blog; defaults to the orders organisation */
+  BLOG_ORGANIZATION_SLUG: z.string().optional(),
   REQUIRE_TOTP: z
     .string()
     .transform((v) => v !== "0" && v !== "false" && v !== "")

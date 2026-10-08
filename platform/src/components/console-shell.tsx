@@ -23,6 +23,7 @@ export type NavIcon =
   | "inbox"
   | "leads"
   | "automations"
+  | "autopilot"
   | "brands"
   | "catalogue"
   | "templates"
@@ -38,48 +39,58 @@ export type NavIcon =
   | "ai"
   | "bell"
   | "profile"
+  | "blog"
   | "setup";
 
 export interface NavItem {
   href: string;
   label: string;
   icon: NavIcon;
-  group: "Create" | "Grow" | "Business" | "Account";
+  group: "Create" | "Publish" | "Manage" | "Platform" | "Account";
   permission?: Permission;
   scope: "tenant" | "platform" | "both";
   tag?: "NEW" | "HOT";
 }
 
 export const NAV: NavItem[] = [
+  // What you make — the daily loop.
   { href: "/app", label: "Home", icon: "home", group: "Create", scope: "tenant" },
   { href: "/content", label: "Studio", icon: "studio", group: "Create", permission: "ai:generate", scope: "tenant", tag: "HOT" },
+  { href: "/app/assistant", label: "Assistant", icon: "ai", group: "Create", permission: "assistant:use", scope: "tenant", tag: "NEW" },
   { href: "/content/assets", label: "Library", icon: "library", group: "Create", permission: "ai:generate", scope: "tenant" },
-  { href: "/app/templates", label: "Templates", icon: "templates", group: "Create", permission: "template:read", scope: "tenant", tag: "NEW" },
-  { href: "/app/characters", label: "Characters", icon: "characters", group: "Create", permission: "character:read", scope: "tenant", tag: "NEW" },
-  { href: "/app/campaigns", label: "Campaigns", icon: "campaigns", group: "Grow", permission: "campaign:read", scope: "tenant" },
-  { href: "/app/social", label: "Social", icon: "social", group: "Grow", permission: "channel:read", scope: "tenant" },
-  { href: "/app/inbox", label: "Inbox", icon: "inbox", group: "Grow", permission: "inbox:read", scope: "tenant", tag: "NEW" },
-  { href: "/app/leads", label: "Leads", icon: "leads", group: "Grow", permission: "lead:read", scope: "tenant" },
-  { href: "/app/automations", label: "Automations", icon: "automations", group: "Grow", permission: "inbox:read", scope: "tenant", tag: "NEW" },
-  { href: "/app/brands", label: "Brands", icon: "brands", group: "Business", permission: "brand:read", scope: "tenant" },
-  { href: "/app/catalogue", label: "Catalogue", icon: "catalogue", group: "Business", permission: "catalogue:read", scope: "tenant" },
-  { href: "/app/orders", label: "Orders", icon: "orders", group: "Business", permission: "order:read", scope: "tenant" },
-  { href: "/app/content", label: "Tasks", icon: "tasks", group: "Business", permission: "content:read", scope: "tenant" },
-  { href: "/platform", label: "Organisations", icon: "organisations", group: "Account", scope: "platform" },
-  { href: "/platform/subscriptions", label: "Subscriptions", icon: "orders", group: "Account", scope: "platform" },
-  { href: "/platform/payments", label: "Payments", icon: "billing", group: "Account", scope: "platform" },
-  { href: "/platform/orders", label: "Orders", icon: "orders", group: "Account", scope: "platform" },
-  { href: "/platform/templates", label: "Templates", icon: "templates", group: "Account", scope: "platform" },
-  { href: "/platform/pricing", label: "Pricing", icon: "catalogue", group: "Account", scope: "platform" },
-  { href: "/platform/ai", label: "AI & credits", icon: "ai", group: "Account", scope: "platform" },
-  { href: "/platform/notifications", label: "Notifications", icon: "bell", group: "Account", scope: "platform" },
+  // Where it goes out and gets answered.
+  { href: "/app/social", label: "Social", icon: "social", group: "Publish", permission: "channel:read", scope: "tenant" },
+  { href: "/app/inbox", label: "Inbox", icon: "inbox", group: "Publish", permission: "inbox:read", scope: "tenant", tag: "NEW" },
+  { href: "/app/automations", label: "Automations", icon: "automations", group: "Publish", permission: "inbox:read", scope: "tenant", tag: "NEW" },
+  { href: "/app/autopilot", label: "Autopilot", icon: "autopilot", group: "Publish", permission: "autopilot:read", scope: "tenant", tag: "NEW" },
+  { href: "/app/campaigns", label: "Campaigns", icon: "campaigns", group: "Publish", permission: "campaign:read", scope: "tenant" },
+  { href: "/app/leads", label: "Leads", icon: "leads", group: "Publish", permission: "lead:read", scope: "tenant" },
+  // The business objects, alpha inside the group.
+  { href: "/app/blog", label: "Blog", icon: "blog", group: "Manage", permission: "blog:read", scope: "tenant", tag: "NEW" },
+  { href: "/app/brands", label: "Brands", icon: "brands", group: "Manage", permission: "brand:read", scope: "tenant" },
+  { href: "/app/characters", label: "Characters", icon: "characters", group: "Manage", permission: "character:read", scope: "tenant" },
+  { href: "/app/content", label: "Content tasks", icon: "tasks", group: "Manage", permission: "content:read", scope: "tenant" },
+  { href: "/app/orders", label: "Orders", icon: "orders", group: "Manage", permission: "order:read", scope: "tenant" },
+  { href: "/app/products", label: "Products", icon: "catalogue", group: "Manage", permission: "product:read", scope: "tenant" },
+  { href: "/app/templates", label: "Templates", icon: "templates", group: "Manage", permission: "template:read", scope: "tenant" },
+  // Platform administration.
+  { href: "/platform", label: "Organisations", icon: "organisations", group: "Platform", scope: "platform" },
+  { href: "/platform/subscriptions", label: "Subscriptions", icon: "orders", group: "Platform", scope: "platform" },
+  { href: "/platform/payments", label: "Payments", icon: "billing", group: "Platform", scope: "platform" },
+  { href: "/platform/orders", label: "Custom orders", icon: "orders", group: "Platform", scope: "platform" },
+  { href: "/platform/templates", label: "Templates", icon: "templates", group: "Platform", scope: "platform" },
+  { href: "/platform/pricing", label: "Pricing", icon: "catalogue", group: "Platform", scope: "platform" },
+  { href: "/platform/ai", label: "AI & credits", icon: "ai", group: "Platform", scope: "platform" },
+  { href: "/platform/assistant", label: "Assistant", icon: "ai", group: "Platform", scope: "platform" },
+  { href: "/platform/notifications", label: "Notifications", icon: "bell", group: "Platform", scope: "platform" },
+  // The person's own account.
   { href: "/app/teams", label: "My teams", icon: "teams", group: "Account", scope: "tenant" },
   { href: "/app/team", label: "Team", icon: "team", group: "Account", permission: "member:read", scope: "tenant" },
   { href: "/billing", label: "Plan & billing", icon: "billing", group: "Account", permission: "org:read", scope: "tenant" },
-  { href: "/setup", label: "Get started", icon: "setup", group: "Account", permission: "org:write", scope: "tenant" },
   { href: "/settings", label: "Settings", icon: "settings", group: "Account", scope: "both" },
   { href: "/account", label: "Profile", icon: "profile", group: "Account", scope: "both" },
   { href: "/security", label: "Security", icon: "security", group: "Account", scope: "both" },
+  { href: "/setup", label: "Get started", icon: "setup", group: "Account", permission: "org:write", scope: "tenant" },
 ];
 
 export async function ConsoleShell(props: { principal: Principal; userName: string; children: ReactNode }) {

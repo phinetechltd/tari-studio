@@ -5,10 +5,12 @@ import { pruneFinished } from "@/server/jobs";
 import { pruneBuckets } from "@/lib/ratelimit";
 import { db } from "@/lib/db";
 import { aiCreditsSweep } from "@/server/ai-credits";
+import { autopilotTick, finishAutopilotRun, runAutopilot } from "@/server/autopilot";
 import { runAutomation } from "@/server/automations";
 import { pollGeneration, submitGeneration } from "@/server/generation";
 import { deliverNotification } from "@/server/notify";
 import { publishPost } from "@/server/social";
+import { checkTikTokStatus, sweepTikTokComments } from "@/server/tiktok-posting";
 import { runBillingSweep } from "@/server/subscriptions";
 
 /**
@@ -70,11 +72,43 @@ export const handlers: Record<string, JobHandler> = {
     await pollGeneration(assetIdOf(job), Number.isFinite(n) ? n : 0);
   },
 
-  /** Publishes one scheduled post to Facebook or Instagram (src/server/social.ts). */
+  /** Autopilot: queue a run for every autopilot whose slot has arrived (src/server/autopilot.ts). */
+  "autopilot.tick": async () => {
+    await autopilotTick();
+  },
+
+  /** Autopilot: start one scheduled run. */
+  "autopilot.run": async (job) => {
+    const p = job.payload as { autopilotId?: unknown; slot?: unknown; manual?: unknown } | null;
+    if (typeof p?.autopilotId !== "string" || typeof p.slot !== "string") throw new Error(`autopilot.run job ${job.id} is missing its autopilot or slot`);
+    await runAutopilot(p.autopilotId, p.slot, p.manual === true);
+  },
+
+  /** Autopilot: when the picture or video is ready, write the caption and post it or hold it for approval. */
+  "autopilot.finish": async (job) => {
+    const p = job.payload as { runId?: unknown; n?: unknown } | null;
+    if (typeof p?.runId !== "string") throw new Error(`autopilot.finish job ${job.id} has no runId`);
+    await finishAutopilotRun(p.runId, typeof p.n === "number" ? p.n : 0);
+  },
+
+  /** Publishes one scheduled post to Facebook, Instagram or TikTok (src/server/social.ts). */
   "publish.post": async (job) => {
     const postId = (job.payload as { postId?: unknown } | null)?.postId;
     if (typeof postId !== "string") throw new Error(`publish.post job ${job.id} has no postId`);
     await publishPost(postId);
+  },
+
+  /** Asks TikTok how a publish is going (src/server/tiktok-posting.ts). */
+  "tiktok.status": async (job) => {
+    const p = job.payload as { postId?: unknown; n?: unknown } | null;
+    if (typeof p?.postId !== "string") throw new Error(`tiktok.status job ${job.id} has no postId`);
+    await checkTikTokStatus(p.postId, typeof p.n === "number" ? p.n : 0);
+  },
+
+  /** Every few minutes: new TikTok comments become COMMENT_RECEIVED automation events. */
+  "tiktok.comments": async () => {
+    const r = await sweepTikTokComments();
+    if (r.events) console.info("[worker] TikTok comments", r);
   },
 
   /** Runs one automation for one event (src/server/automations.ts). */

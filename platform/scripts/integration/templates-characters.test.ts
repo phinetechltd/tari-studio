@@ -4,6 +4,8 @@ import os from "node:os";
 import path from "node:path";
 import { after, before, describe, it } from "node:test";
 
+import sharp from "sharp";
+
 import { ApiError } from "@/lib/api";
 import { db } from "@/lib/db";
 import { resetEnvCache } from "@/lib/env";
@@ -31,8 +33,10 @@ import {
 
 import { addMember, makeOrg, makeUser, principal, rejection } from "./_helpers";
 
-// A 1x1 PNG, a JPEG header, and things that must be refused.
-const PNG = Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==", "base64");
+// A real 400x400 PNG (the size rules refuse tiny images), a JPEG header, and things that must be refused.
+let PNG: Buffer;
+const solid = (width: number, height: number) =>
+  sharp({ create: { width, height, channels: 3, background: "#c8321e" } }).png().toBuffer();
 const file = (bytes: Uint8Array | string, name = "x.png", type = "image/png") => new File([bytes as BlobPart], name, { type });
 
 describe("templates and characters", () => {
@@ -40,6 +44,7 @@ describe("templates and characters", () => {
   const admin = principal({ role: "SUPER_ADMIN", organizationId: null, userId: "admin-user", mfa: true });
 
   before(async () => {
+    PNG = await solid(400, 400);
     dir = await mkdtemp(path.join(os.tmpdir(), "tari-store-"));
     process.env.STORAGE_DIR = path.relative(process.cwd(), dir);
     resetEnvCache();
@@ -61,6 +66,18 @@ describe("templates and characters", () => {
     assert.equal(sniffImage(new Uint8Array([0xff, 0xd8, 0xff, 0xe0, 0, 0, 0, 0, 0, 0, 0, 0]))?.mimeType, "image/jpeg");
     assert.equal(sniffImage(Buffer.from("<svg xmlns='http://www.w3.org/2000/svg'><script>alert(1)</script></svg>")), null);
     assert.equal(sniffImage(Buffer.from("<html>not an image</html>")), null);
+  });
+
+  it("refuses pictures that are too small or too large, with a clear reason", async () => {
+    const { p } = await agency();
+    const c = await createCharacter(p, characterSchema.parse({ name: "Sized", description: "Checks the size rules." }));
+    const tiny = await rejection(async () => addCharacterImages(p, c.id, [file(await solid(120, 400))]));
+    assert.ok(tiny instanceof ApiError);
+    assert.match(tiny.message, /too small/i);
+    const huge = await rejection(async () => addCharacterImages(p, c.id, [file(await solid(4200, 400))]));
+    assert.ok(huge instanceof ApiError);
+    assert.match(huge.message, /too large/i);
+    assert.equal((await addCharacterImages(p, c.id, [file(await solid(300, 300))])).length, 1, "exactly the minimum is fine");
   });
 
   describe("templates", () => {

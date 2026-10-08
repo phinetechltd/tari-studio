@@ -10,6 +10,7 @@ const LINKS = [
   { href: "/#showcase", label: "Showcase" },
   { href: "/#studio", label: "Studio" },
   { href: "/pricing", label: "Pricing" },
+  { href: "/blog", label: "Blog" },
   { href: "/#order", label: "Done for you" },
 ];
 
@@ -78,6 +79,7 @@ export function SiteFooter() {
           title="Company"
           links={[
             { href: "/pricing", label: "Pricing" },
+            { href: "/blog", label: "Blog" },
             { href: "/login", label: "Sign in" },
             { href: "/signup", label: "Create an account" },
             { href: "/#faq", label: "Questions" },

@@ -7,11 +7,15 @@ import {
   buildModelInput,
   fitQuote,
   fitSeconds,
+  imageSizeProblem,
+  INPUT_IMAGE_LIMITS,
   modelCredits,
   MODES,
   normaliseStatus,
   outputUrl,
   secondsLabel,
+  sendSize,
+  supportsStartImage,
 } from "./generation-models";
 import { defaultPricingInput, resolvePricing } from "./pricing";
 
@@ -113,5 +117,28 @@ describe("generation models", () => {
   it("uses one media type per mode", () => {
     assert.equal(MODES.image.media, "IMAGE");
     for (const m of ["video", "animate", "extend"] as const) assert.equal(MODES[m].media, "VIDEO");
+  });
+});
+
+describe("input image rules", () => {
+  it("accepts the limits themselves and refuses just outside them", () => {
+    assert.equal(imageSizeProblem(INPUT_IMAGE_LIMITS.minSide, INPUT_IMAGE_LIMITS.minSide), null);
+    assert.equal(imageSizeProblem(INPUT_IMAGE_LIMITS.maxSide, 1000), null);
+    assert.match(imageSizeProblem(INPUT_IMAGE_LIMITS.minSide - 1, 1000) ?? "", /too small/);
+    assert.match(imageSizeProblem(INPUT_IMAGE_LIMITS.maxSide + 1, 1000) ?? "", /too large/);
+    assert.match(imageSizeProblem(0, 0) ?? "", /could not be read/);
+  });
+
+  it("scales only what is over the send size, keeping the shape", () => {
+    assert.deepEqual(sendSize(1200, 800), { width: 1200, height: 800 });
+    assert.deepEqual(sendSize(4096, 2048), { width: 2048, height: 1024 });
+    assert.deepEqual(sendSize(1000, 4000), { width: 512, height: 2048 });
+  });
+
+  it("starts from a picture only on the video families Higgsfield documents for it", () => {
+    assert.equal(supportsStartImage("seedance"), true);
+    assert.equal(supportsStartImage("kling"), true);
+    assert.equal(supportsStartImage("hailuo"), true);
+    assert.equal(supportsStartImage("soul"), false);
   });
 });

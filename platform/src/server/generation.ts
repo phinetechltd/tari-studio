@@ -18,12 +18,14 @@ import {
   type ModelFamily,
 } from "@/lib/generation-models";
 import { isPaidPlan, PricingError, videoCreditsFor, type Pricing } from "@/lib/pricing";
+import type { StartImageRef } from "@/lib/studio-context";
 
 import { alertProviderOutOfCredits, claimAlert, recordUsage } from "./ai-credits";
 import { modelByKey, resolveModel } from "./ai-models";
 import { GenerationProviderError, generationProviderFor, providerForRequest } from "./higgsfield";
 import { enqueue } from "./jobs";
 import { notify } from "./notify";
+import { providerUrlFor } from "./reference-images";
 import { saveFromUrl } from "./storage";
 import { refund, spend, wallet } from "./credits";
 import { getPricing } from "./pricing-store";
@@ -58,8 +60,11 @@ export interface GenerationRequest {
   brandId?: string | null;
   /** The campaign this creative is for (listed on the campaign page) */
   campaignId?: string | null;
-  /** Template and characters that shaped the prompt, kept in the asset's metadata */
-  context?: { templateId?: string | null; characterIds?: string[] } | null;
+  /**
+   * What shaped the prompt, kept in the asset's metadata. `startImage` is the picture that starts a video
+   * (it turns a text-to-video request into image-to-video where the model supports it).
+   */
+  context?: { templateId?: string | null; characterIds?: string[]; brandId?: string | null; productId?: string | null; startImage?: StartImageRef | null } | null;
   /** A catalogue model (AiModel.key); the mode's default when not given */
   modelKey?: string | null;
 }
@@ -114,13 +119,16 @@ export async function requestGeneration(
   req: GenerationRequest,
   withinTx?: (tx: Tx, asset: GeneratedAsset) => Promise<void>,
 ): Promise<GeneratedAsset> {
-  const spec = MODES[req.mode];
   const prompt = req.prompt.trim();
   if (prompt.length < 3) throw new ApiError(422, "VALIDATION_FAILED", "Describe what you want in a few words.");
   if (prompt.length > 2000) throw new ApiError(422, "VALIDATION_FAILED", "Keep the prompt under 2,000 characters.");
   const pricing = await getPricing();
   const model = await resolveModel(req.mode, req.modelKey);
   const cost = creditsFor(pricing, req.mode, req.seconds, model);
+  // A picture can start a video where the model has an image-to-video endpoint: the request then runs as "animate".
+  const startImage = req.mode === "video" && req.context?.startImage && model.endpoints.animate ? req.context.startImage : null;
+  const mode: GenerationMode = startImage ? "animate" : req.mode;
+  const spec = MODES[mode];
 
   const limit = await parallelLimit(req.organizationId, pricing);
   if (limit !== null) {
@@ -135,7 +143,7 @@ export async function requestGeneration(
     }
   }
 
-  if (spec.source) {
+  if (spec.source && !startImage) {
     if (!req.parentAssetId) throw new ApiError(422, "VALIDATION_FAILED", `${spec.label} starts from an existing ${spec.source.toLowerCase()}.`);
     const parent = await db.generatedAsset.findFirst({
       where: { id: req.parentAssetId, organizationId: req.organizationId, status: "READY", archivedAt: null },
@@ -148,7 +156,7 @@ export async function requestGeneration(
 
   // Validate the provider body now, so a bad request fails here and not in the worker.
   try {
-    buildModelInput(model.family, req.mode, {
+    buildModelInput(model.family, mode, {
       prompt,
       seconds: req.seconds,
       aspectRatio: req.aspectRatio,
@@ -166,7 +174,7 @@ export async function requestGeneration(
         campaignId: req.campaignId ?? null,
         status: "GENERATING",
         mediaType: spec.media,
-        model: model.endpoints[req.mode]!,
+        model: model.endpoints[mode]!,
         modelKey: model.key,
         prompt,
         requestId: `gen_${crypto.randomUUID()}`,
@@ -178,9 +186,12 @@ export async function requestGeneration(
         orderId: req.orderId ?? null,
         parentAssetId: req.parentAssetId ?? null,
         metadata: {
-          mode: req.mode,
+          mode,
           ...(req.context?.templateId ? { templateId: req.context.templateId } : {}),
           ...(req.context?.characterIds?.length ? { characterIds: req.context.characterIds } : {}),
+          ...(req.context?.brandId ? { brandId: req.context.brandId } : {}),
+          ...(req.context?.productId ? { productId: req.context.productId } : {}),
+          ...(startImage ? { startImage: { source: startImage.source, id: startImage.id } } : {}),
         } satisfies Prisma.InputJsonValue,
       },
     });
@@ -213,7 +224,7 @@ export async function requestGeneration(
     action: "GENERATION_REQUEST",
     entity: "GeneratedAsset",
     entityId: asset.id,
-    changes: { mode: req.mode, model: model.key, seconds: req.seconds ?? null, credits: asset.tokensCharged, orderId: req.orderId ?? null },
+    changes: { mode, startImage: startImage?.source ?? null, model: model.key, seconds: req.seconds ?? null, credits: asset.tokensCharged, orderId: req.orderId ?? null },
   });
   await warnIfWalletEmpty(req.organizationId, pricing);
   return asset;
@@ -302,26 +313,39 @@ export async function submitGeneration(assetId: string, finalAttempt: boolean): 
     return;
   }
 
-  const mode = ((asset.metadata as { mode?: GenerationMode } | null)?.mode ?? (asset.mediaType === "IMAGE" ? "image" : "video")) as GenerationMode;
-  let input: Record<string, unknown>;
-  try {
-    input = buildModelInput(await familyOf(asset, mode), mode, {
-      prompt: asset.prompt,
-      seconds: asset.durationSeconds ?? undefined,
-      aspectRatio: (asset.aspectRatio ?? MODES[mode].defaultAspect) as AspectRatio,
-      sourceUrl: asset.parent?.url ?? undefined,
-    });
-  } catch (e) {
-    await failGeneration(asset.id, (e as Error).message);
-    return;
-  }
+  const meta = (asset.metadata ?? {}) as {
+    mode?: GenerationMode;
+    startImage?: StartImageRef;
+    brandId?: string;
+    productId?: string;
+    characterIds?: string[];
+    templateId?: string;
+  };
+  const mode = (meta.mode ?? (asset.mediaType === "IMAGE" ? "image" : "video")) as GenerationMode;
 
   let billedTo: "platform" | "organization" = "platform";
   try {
     const provider = await generationProviderFor(asset.organizationId);
     billedTo = provider.billedTo;
+    // A starting picture is sent to the provider first; a video is never started from a picture it never received.
+    let sourceUrl = asset.parent?.url ?? undefined;
+    if (meta.startImage && !sourceUrl) {
+      sourceUrl = await providerUrlFor(asset.organizationId, meta.startImage, meta, provider);
+    }
+    let input: Record<string, unknown>;
+    try {
+      input = buildModelInput(await familyOf(asset, mode), mode, {
+        prompt: asset.prompt,
+        seconds: asset.durationSeconds ?? undefined,
+        aspectRatio: (asset.aspectRatio ?? MODES[mode].defaultAspect) as AspectRatio,
+        sourceUrl,
+      });
+    } catch (e) {
+      await failGeneration(asset.id, (e as Error).message);
+      return;
+    }
     // What the platform will be charged, recorded as usage when the render completes.
-    // An organisation on its own key pays the provider itself, so nothing is recorded.
+    // Generation is platform-managed, so every finished render draws on the platform balance.
     const cost = provider.billedTo === "platform" && asset.providerMilliCredits === null ? await provider.estimate(asset.model, input, mode) : null;
     if (cost) {
       await db.generatedAsset.update({ where: { id: asset.id }, data: { providerMilliCredits: cost.milliCredits, providerUsdMicros: cost.usdMicros } });

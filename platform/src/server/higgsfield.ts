@@ -5,7 +5,6 @@ import crypto from "node:crypto";
 import { env } from "@/lib/env";
 import { normaliseStatus, outputUrl, type GenerationMode, type RemoteStatus } from "@/lib/generation-models";
 import { providerName } from "@/lib/providers";
-import { resolveGateway } from "@/server/gateways";
 
 /**
  * Talks to the Higgsfield API (docs.higgsfield.ai): submit a request, then poll
@@ -53,6 +52,11 @@ export interface GenerationProvider {
   status(requestId: string): Promise<RemoteState>;
   /** The cost of a request, from POST /estimate/{endpoint} (same body as the request). Null when unavailable. */
   estimate(endpoint: string, input: Record<string, unknown>, mode: GenerationMode): Promise<CostEstimate | null>;
+  /**
+   * Hands the provider a picture and returns the public URL to pass as `image_url`
+   * (docs.higgsfield.ai, "File uploads": generate-upload-url, then PUT to the presigned URL).
+   */
+  uploadImage(bytes: Uint8Array, mimeType: string): Promise<string>;
 }
 
 /** "1.500" credits, "0.094" dollars → integers. Null for anything unreadable. */
@@ -100,6 +104,37 @@ function higgsfield(credentials: string, billedTo: GenerationProvider["billedTo"
       } catch {
         return null; // an estimate is bookkeeping; never a reason to fail the render
       }
+    },
+
+    async uploadImage(bytes, mimeType) {
+      let res: Response;
+      try {
+        res = await fetch(`${BASE}/files/generate-upload-url`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({ content_type: mimeType }),
+          signal: AbortSignal.timeout(20_000),
+        });
+      } catch (e) {
+        throw new GenerationProviderError(`Could not reach the generation service (${(e as Error).message}).`, true);
+      }
+      const body = (await res.json().catch(() => null)) as { upload_url?: string; public_url?: string; headers?: Record<string, string> } | null;
+      if (!res.ok) throw describeHttpError(res.status, body);
+      if (!body?.upload_url || !body.public_url) throw new GenerationProviderError("The generation service did not return an upload link.", true);
+      try {
+        // The presigned link is not ours to sign: never send the API key to it.
+        const put = await fetch(body.upload_url, {
+          method: "PUT",
+          headers: { "Content-Type": mimeType, ...(body.headers ?? {}) },
+          body: new Uint8Array(bytes),
+          signal: AbortSignal.timeout(60_000),
+        });
+        if (!put.ok) throw new GenerationProviderError(`Sending the picture failed (HTTP ${put.status}).`, put.status >= 500);
+      } catch (e) {
+        if (e instanceof GenerationProviderError) throw e;
+        throw new GenerationProviderError(`Could not send the picture (${(e as Error).message}).`, true);
+      }
+      return body.public_url;
     },
 
     async submit(endpoint, input) {
@@ -154,6 +189,10 @@ function simulator(delayMs = Number(process.env.SIMULATOR_GEN_MS ?? 8000)): Gene
       const seconds = Number(input.duration) || 5;
       return { milliCredits: seconds * 1250, usdMicros: seconds * 78_000 };
     },
+    async uploadImage(bytes) {
+      // A stand-in link: the simulator never reads it.
+      return `sim://upload/${crypto.createHash("sha256").update(bytes).digest("hex").slice(0, 16)}`;
+    },
     async submit(_endpoint, input, mode) {
       const fails = typeof input.prompt === "string" && input.prompt.includes("[fail]");
       const media = mode === "image" ? "IMAGE" : "VIDEO";
@@ -180,34 +219,28 @@ export function generationProvider(): GenerationProvider {
 }
 
 /**
- * The provider for an organisation's generations: a key the Owner saved in
- * Settings runs ahead of the deployment's HF_CREDENTIALS, since the org pays
- * for its own renders.
+ * The provider for an organisation's generations: generation is platform-managed,
+ * so every organisation runs on the deployment's HF_CREDENTIALS. The
+ * organizationId stays in the signature for the callers and for metering; it no
+ * longer selects a key.
  */
 export async function generationProviderFor(organizationId: string): Promise<GenerationProvider> {
+  void organizationId;
   if (providerName("GENERATION") === "simulator") return simulator();
-  const org = await resolveGateway(organizationId, "video").catch(() => null);
-  const own = org?.apiKey?.includes(":") ? org.apiKey : null;
-  const credentials = own || env().HF_CREDENTIALS;
+  const credentials = env().HF_CREDENTIALS;
   if (!credentials || !credentials.includes(":")) {
-    throw new GenerationProviderError("Generation is not configured: set HF_CREDENTIALS, or save credentials in Settings.", false);
+    throw new GenerationProviderError("Generation is not configured: the platform admin sets HF_CREDENTIALS (console Deployment keys or the server .env).", false);
   }
-  return higgsfield(credentials, own ? "organization" : "platform");
+  return higgsfield(credentials, "platform");
 }
 
 /**
  * The provider an existing request belongs to, judged by its id. A request
- * started on the simulator is never re-checked against Higgsfield. The org's
- * own saved credentials run ahead of the deployment's, since the org pays for
- * its own renders.
+ * started on the simulator is never re-checked against Higgsfield. Generation
+ * is platform-managed: the deployment's credentials handle every request.
  */
 export async function providerForRequest(requestId: string, organizationId?: string): Promise<GenerationProvider> {
+  void organizationId;
   if (requestId.startsWith("sim_")) return simulator();
-  if (organizationId) {
-    const org = await resolveGateway(organizationId, "video").catch(() => null);
-    const own = org?.apiKey?.includes(":") ? org.apiKey : null;
-    const credentials = own || env().HF_CREDENTIALS;
-    if (credentials?.includes(":")) return higgsfield(credentials, own ? "organization" : "platform");
-  }
   return generationProvider();
 }

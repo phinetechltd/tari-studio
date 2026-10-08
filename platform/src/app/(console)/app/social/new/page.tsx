@@ -4,6 +4,7 @@ import { ConnectForms } from "@/components/social/connect-forms";
 import { EmptyState, PageHeader } from "@/components/ui";
 import { db } from "@/lib/db";
 import { env } from "@/lib/env";
+import { configuredProviderName } from "@/lib/providers";
 import { requirePermission } from "@/lib/session";
 import { isSimulated } from "@/server/meta";
 
@@ -19,7 +20,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
     <>
       <PageHeader
         title="Connect accounts"
-        subtitle="Connect a brand's Facebook Page and Instagram account to publish, and its WhatsApp Business number to answer customers."
+        subtitle="Connect a brand's Facebook Page, Instagram and TikTok accounts to publish, and its WhatsApp Business number to answer customers."
         back={{ href: "/app/social", label: "Social" }}
       />
       {brands.length === 0 ? (
@@ -31,6 +32,7 @@ export default async function ConnectPage({ searchParams }: { searchParams: Prom
           simulated={isSimulated()}
           webhookUrl={`${env().APP_BASE_URL.replace(/\/$/, "")}/api/webhooks/whatsapp`}
           webhookReady={Boolean(env().META_APP_SECRET && env().META_WEBHOOK_VERIFY_TOKEN)}
+          tiktokMode={configuredProviderName("TIKTOK")}
         />
       )}
     </>

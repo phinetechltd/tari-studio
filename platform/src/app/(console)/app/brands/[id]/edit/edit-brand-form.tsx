@@ -18,7 +18,16 @@ interface Brand {
   timezone?: string;
   defaultCurrency?: string;
   avatarUrl?: string;
+  slogan?: string | null;
 }
+
+/** The friendly guideline fields; anything else already stored in guidelines is kept as it is. */
+const GUIDE_FIELDS = [
+  { key: "voice", label: "How the brand sounds", placeholder: "Warm and neighbourly, short sentences, a little humour", rows: 2 },
+  { key: "dos", label: "Always", placeholder: "Mention it is locally made. Use the price.", rows: 2 },
+  { key: "donts", label: "Never", placeholder: "No slang. No discounts we have not announced.", rows: 2 },
+  { key: "colors", label: "Brand colours", placeholder: "Deep green and gold", rows: 1 },
+] as const;
 
 export function EditBrandForm({ brandId }: { brandId: string }) {
   const router = useRouter();
@@ -43,7 +52,11 @@ export function EditBrandForm({ brandId }: { brandId: string }) {
     const data = {
       name: (form.elements.namedItem("name") as HTMLInputElement)?.value?.trim() || "",
       avatarUrl: (form.elements.namedItem("avatarUrl") as HTMLInputElement)?.value?.trim() || undefined,
-      guidelines: (form.elements.namedItem("guidelines") as HTMLTextAreaElement)?.value?.trim() || undefined,
+      slogan: (form.elements.namedItem("slogan") as HTMLInputElement)?.value?.trim() || null,
+      guidelines: {
+        ...(brand.guidelines ?? {}),
+        ...Object.fromEntries(GUIDE_FIELDS.map((g) => [g.key, (form.elements.namedItem(`g-${g.key}`) as HTMLTextAreaElement)?.value?.trim() ?? ""])),
+      },
       contactName: (form.elements.namedItem("contactName") as HTMLInputElement)?.value?.trim() || undefined,
       contactEmail: (form.elements.namedItem("contactEmail") as HTMLInputElement)?.value?.trim() || undefined,
       contactPhone: (form.elements.namedItem("contactPhone") as HTMLInputElement)?.value?.trim() || undefined,
@@ -114,18 +127,28 @@ export function EditBrandForm({ brandId }: { brandId: string }) {
         </div>
 
         <div>
-          <label className="mb-1 block text-sm font-medium" htmlFor="guidelines">
-            Brand Guidelines
-          </label>
-          <textarea
-            id="guidelines"
-            name="guidelines"
-            rows={5}
-            className="input font-mono text-xs"
-            placeholder='{"tone": "friendly", "colors": "#22c55e, #16a34a", "voice": "Warm and approachable, like a neighbour"}'
-          >{brand.guidelines ? JSON.stringify(brand.guidelines, null, 2) : ""}</textarea>
-          <p className="mt-1 text-xs text-muted">JSON format: tone, voice, colors, fonts, dos and don'ts.</p>
+          <label className="mb-1 block text-sm font-medium" htmlFor="slogan">Slogan</label>
+          <input id="slogan" name="slogan" maxLength={160} defaultValue={brand.slogan ?? ""} className="input" placeholder="e.g. Fresh from the farm, every day" />
+          <p className="mt-1 text-xs text-muted">A short line the brand is known for. Captions and videos use it.</p>
         </div>
+
+        <fieldset className="space-y-3 rounded-xl border border-line p-4">
+          <legend className="px-1 text-sm font-medium">Brand voice</legend>
+          {GUIDE_FIELDS.map((g) => (
+            <div key={g.key}>
+              <label className="mb-1 block text-sm text-muted" htmlFor={`g-${g.key}`}>{g.label}</label>
+              <textarea
+                id={`g-${g.key}`}
+                name={`g-${g.key}`}
+                rows={g.rows}
+                maxLength={500}
+                className="input"
+                placeholder={g.placeholder}
+                defaultValue={typeof brand.guidelines?.[g.key] === "string" ? (brand.guidelines[g.key] as string) : ""}
+              />
+            </div>
+          ))}
+        </fieldset>
 
         <div className="grid grid-cols-2 gap-4">
           <div>

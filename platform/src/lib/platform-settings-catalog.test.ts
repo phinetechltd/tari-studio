@@ -14,6 +14,9 @@ const SAMPLES: Record<string, string> = {
   SMS_DAILY_CAP: "300",
 };
 
+/** Identifiers that are public by design: they appear in every sign-in URL. */
+const PUBLIC_IDS = new Set(["META_APP_ID", "TIKTOK_CLIENT_KEY", "PAYSTACK_PUBLIC_KEY"]); // app ids and Paystack's publishable key are safe to show by design
+
 const BASE = { DATABASE_URL: "postgresql://x@localhost/x", AUTH_SECRET: "a-test-secret-that-is-long-enough-0123" };
 
 describe("platform settings catalogue", () => {
@@ -35,7 +38,7 @@ describe("platform settings catalogue", () => {
 
   it("marks every key, secret and token as secret", () => {
     for (const s of PLATFORM_SETTINGS) {
-      if (/_(KEY|SECRET|PASSKEY|TOKEN|CREDENTIALS|PASSWORD)$/.test(s.key) && s.key !== "META_APP_ID") assert.ok(s.secret, `${s.key} should be secret`);
+      if (/_(KEY|SECRET|PASSKEY|TOKEN|CREDENTIALS|PASSWORD)$/.test(s.key) && !PUBLIC_IDS.has(s.key)) assert.ok(s.secret, `${s.key} should be secret`);
     }
   });
 

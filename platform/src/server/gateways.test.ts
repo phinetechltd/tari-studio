@@ -17,17 +17,13 @@ describe("gateway settings catalog", () => {
 
   it("secrets are declared for the credentials people type into a form", () => {
     // The values that must never sit in plaintext config.
-    assert.equal(GATEWAYS.ai.fields.find((f) => f.name === "apiKey")?.secret, true);
-    assert.equal(GATEWAYS.video.fields.find((f) => f.name === "apiKey")?.secret, true);
     assert.equal(GATEWAYS.social.fields.find((f) => f.name === "appSecret")?.secret, true);
     assert.equal(GATEWAYS.social.fields.find((f) => f.name === "webhookVerifyToken")?.secret, true);
-    assert.equal(GATEWAYS.mpesa.fields.find((f) => f.name === "passkey")?.secret, true);
     // Non-secret identity fields stay readable.
     assert.equal(GATEWAYS.social.fields.find((f) => f.name === "appId")?.secret, false);
-    assert.equal(GATEWAYS.mpesa.fields.find((f) => f.name === "shortcode")?.secret, false);
   });
 
-  it("every gateway covers the four the console offers", () => {
-    assert.deepEqual(Object.keys(GATEWAYS).sort(), ["ai", "mpesa", "social", "video"]);
+  it("offers only the social gateway: AI, generation and payment keys are platform-managed", () => {
+    assert.deepEqual(Object.keys(GATEWAYS), ["social"]);
   });
 });

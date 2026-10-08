@@ -89,7 +89,25 @@ export type AuditAction =
   | "NOTIFICATION_RETRY"
   | "NOTIFICATION_TEST"
   | "PROFILE_UPDATE"
-  | "SETUP_UPDATE";
+  | "SETUP_UPDATE"
+  // Products, brand profile and Autopilot
+  | "PRODUCT_CREATE"
+  | "PRODUCT_UPDATE"
+  | "PRODUCT_ARCHIVE"
+  | "PRODUCT_STOCK"
+  | "BRAND_PROFILE_UPDATE"
+  | "AUTOPILOT_CREATE"
+  | "AUTOPILOT_UPDATE"
+  | "AUTOPILOT_DELETE"
+  | "AUTOPILOT_RUN"
+  | "AUTOPILOT_APPROVE"
+  | "AUTOPILOT_REJECT"
+  // The in-app assistant
+  | "ASSISTANT_CONFIG_UPDATE"
+  | "ASSISTANT_MESSAGE"
+  | "ASSISTANT_BLOCKED"
+  | "ASSISTANT_PROPOSAL_APPLY"
+  | "ASSISTANT_PROPOSAL_DISMISS";
 
 export interface AuditInput {
   organizationId?: string | null;

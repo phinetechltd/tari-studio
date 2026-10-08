@@ -90,7 +90,7 @@ describe("rbac", () => {
 
   it("a Designer holds the narrowest set and cannot see money-adjacent or admin surfaces", () => {
     const perms = permissionsOf("DESIGNER");
-    assert.deepEqual([...perms].sort(), ["brand:read", "catalogue:read", "task:work"]);
+    assert.deepEqual([...perms].sort(), ["brand:read", "product:read", "task:work"]);
   });
 
   it("nobody but Owners can connect channels, and Marketers cannot approve their own work", () => {

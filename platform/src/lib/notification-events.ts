@@ -33,7 +33,7 @@ export interface EventSpec {
   key: string;
   label: string;
   description: string;
-  group: "Billing" | "Orders" | "Studio" | "Automations" | "Platform";
+  group: "Billing" | "Orders" | "Studio" | "Products" | "Autopilot" | "Automations" | "Platform";
   audience: Audience;
   /** Account and money matters: people cannot opt out, only an admin can switch a channel off */
   essential: boolean;
@@ -125,6 +125,50 @@ export const EVENTS = [
     defaults: on(false, false),
   },
   {
+    key: "product.low_stock",
+    label: "Product running low",
+    description: "A tracked product fell to its warning level or ran out.",
+    group: "Products",
+    audience: "managers",
+    essential: false,
+    defaults: on(true, false),
+  },
+  {
+    key: "autopilot.needs_approval",
+    label: "Autopilot post waiting for approval",
+    description: "An Autopilot set to ask first has made a post for you to approve.",
+    group: "Autopilot",
+    audience: "team",
+    essential: false,
+    defaults: on(true, false),
+  },
+  {
+    key: "autopilot.posted",
+    label: "Autopilot posted",
+    description: "An Autopilot published a post.",
+    group: "Autopilot",
+    audience: "team",
+    essential: false,
+    defaults: on(false, false),
+  },
+  {
+    key: "autopilot.skipped",
+    label: "Autopilot skipped a post",
+    description: "A scheduled run was skipped (not enough credits, nothing in stock, or the monthly limit).",
+    group: "Autopilot",
+    audience: "managers",
+    essential: false,
+    defaults: on(true, false),
+  },
+  {
+    key: "autopilot.paused",
+    label: "Autopilot switched itself off",
+    description: "Repeated failures or a disconnected account stopped an Autopilot.",
+    group: "Autopilot",
+    audience: "owners",
+    essential: true,
+    defaults: on(true, false),
+  },  {
     key: "automation.notify",
     label: "Automation alerts",
     description: "An automation's \"notify the team\" step.",

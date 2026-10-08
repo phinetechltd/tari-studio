@@ -43,8 +43,8 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
     <>
       <PageHeader
         title={brand.name}
-        subtitle={`${brand.brandNumber} · ${brand.slug} · ${brand.status === "ACTIVE" ? "Active" : "Archived"}`}
-        avatarUrl={brand.avatarUrl ?? undefined}
+        subtitle={`${brand.slogan ? `“${brand.slogan}” · ` : ""}${brand.brandNumber} · ${brand.slug} · ${brand.status === "ACTIVE" ? "Active" : "Archived"}`}
+        avatarUrl={brand.logoKey ? `/api/brands/${brand.id}/logo?v=${brand.updatedAt.getTime()}` : (brand.avatarUrl ?? undefined)}
         actions={
           <>
             <Link
@@ -66,10 +66,16 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
               + New Campaign
             </Link>
             <Link
-              href={`/app/catalogue/new?brandId=${brand.id}`}
+              href={`/app/products/new?brandId=${brand.id}`}
               className="inline-flex min-h-[44px] items-center rounded-button border border-line bg-bg px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface hover:text-ink ml-2"
             >
-              + Catalogue Item
+              + Product
+            </Link>
+            <Link
+              href={`/content?brand=${brand.id}`}
+              className="inline-flex min-h-[44px] items-center rounded-button border border-line bg-bg px-4 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface hover:text-ink ml-2"
+            >
+              Make something
             </Link>
             <Link
               href={`/app/social/new?brandId=${brand.id}`}
@@ -81,10 +87,15 @@ export default async function BrandDetailPage({ params }: { params: Promise<{ id
         }
       />
 
+      {brand.coverImageKey ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={`/api/brands/${brand.id}/cover?v=${brand.updatedAt.getTime()}`} alt="" className="mb-6 aspect-[3/1] w-full rounded-card border border-line object-cover" />
+      ) : null}
+
       {/* Quick stats */}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4 mb-8">
         {[
-          { label: "Catalogue Items", count: brand._count.catalogueItems, href: `/app/brands/${brand.id}` },
+          { label: "Products", count: brand._count.catalogueItems, href: `/app/products?brand=${brand.id}` },
           { label: "Content Tasks", count: brand._count.tasks, href: "/app/content" },
           { label: "Social Channels", count: brand._count.channels, href: "/app/social" },
           { label: "Campaigns", count: brand._count.campaigns, href: "/app/campaigns" },

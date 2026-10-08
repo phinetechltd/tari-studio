@@ -10,6 +10,7 @@ import {
   MessageConditionsSchema,
   messageMatches,
   renderTemplate,
+  TEXT_TRIGGERS,
   type Action,
   type AutomationInput,
   type Trigger,
@@ -18,7 +19,7 @@ import { db } from "@/lib/db";
 import type { Principal } from "@/lib/rbac";
 import { orgIdOf, scope } from "@/lib/tenant";
 
-import { draftWhatsAppReply } from "./copywriter";
+import { draftCommentReply, draftWhatsAppReply } from "./copywriter";
 import { enqueue } from "./jobs";
 import { notify } from "./notify";
 import { sendWhatsAppText } from "./whatsapp";
@@ -38,6 +39,12 @@ export interface AutomationContext {
   messageId?: string;
   contactId?: string;
   body?: string | null;
+  /** A TikTok comment (COMMENT_RECEIVED) */
+  channelId?: string;
+  commentId?: string;
+  videoId?: string;
+  authorName?: string | null;
+  videoCaption?: string | null;
   postId?: string;
   channelName?: string;
   brandName?: string;
@@ -67,7 +74,7 @@ export async function fireAutomations(event: AutomationEvent): Promise<number> {
 
   let queued = 0;
   for (const rule of rules) {
-    if (event.trigger === "MESSAGE_RECEIVED") {
+    if (TEXT_TRIGGERS.has(event.trigger)) {
       const conditions = MessageConditionsSchema.safeParse(rule.conditions);
       if (conditions.success && !messageMatches(conditions.data, event.context.body ?? null)) continue;
     }
@@ -185,11 +192,18 @@ async function perform(
 
   switch (action.type) {
     case "SEND_REPLY": {
+      if (ctx.commentId) return replyUnderComment(organizationId, ctx, renderTemplate(action.text, { ...vars, name: ctx.authorName ?? vars.name }));
       const c = needConversation();
       await sendWhatsAppText(c.id, renderTemplate(action.text, vars), { author: "AUTOMATION", automationId });
       return undefined;
     }
     case "AI_REPLY": {
+      if (ctx.commentId) {
+        const channel = await db.socialChannel.findFirst({ where: { id: ctx.channelId, organizationId }, select: { brandId: true } });
+        if (!channel) throw new Error("The TikTok account is no longer connected.");
+        const reply = await draftCommentReply({ organizationId, brandId: channel.brandId, comment: ctx.body ?? "", author: ctx.authorName, videoCaption: ctx.videoCaption, instructions: action.instructions });
+        return replyUnderComment(organizationId, ctx, reply);
+      }
       const c = needConversation();
       const reply = await draftWhatsAppReply({ organizationId, conversationId: c.id, instructions: action.instructions });
       await sendWhatsAppText(c.id, reply, { author: "AI", automationId });
@@ -209,14 +223,24 @@ async function perform(
       return action.tag;
     }
     case "NOTIFY_TEAM": {
-      const href = conversation ? `/app/inbox?c=${conversation.id}` : ctx.postId ? "/app/social" : "/app";
+      const href = conversation ? `/app/inbox?c=${conversation.id}` : ctx.postId || ctx.commentId ? "/app/social" : "/app";
       const body = conversation
         ? `${conversation.contact.name ?? conversation.contact.phone}: ${(ctx.body ?? "").slice(0, 140)}`
+        : ctx.commentId
+        ? `TikTok comment from @${ctx.authorName ?? "someone"} on ${ctx.channelName ?? "your account"}: ${(ctx.body ?? "").slice(0, 140)}`
         : ctx.error ?? ctx.url ?? ctx.channelName ?? null;
       const sent = await notify({ event: "automation.notify", organizationId, title: renderTemplate(action.message, vars).slice(0, 200), body, href });
       return `${sent.recipients} people`;
     }
   }
+}
+
+/** Replies under the TikTok comment that started the run (loaded lazily: tiktok-posting fires automations too). */
+async function replyUnderComment(organizationId: string, ctx: AutomationContext, text: string): Promise<string> {
+  if (!ctx.channelId || !ctx.videoId || !ctx.commentId) throw new Error("The comment to reply to is missing.");
+  const { replyToTikTokComment } = await import("./tiktok-posting");
+  await replyToTikTokComment({ organizationId, channelId: ctx.channelId, videoId: ctx.videoId, commentId: ctx.commentId, text });
+  return `replied on TikTok (${text.length} characters)`;
 }
 
 // ── management ───────────────────────────────────────────────────────────

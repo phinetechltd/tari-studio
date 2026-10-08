@@ -6,6 +6,7 @@ import { createBrand, listBrands } from "@/server/brands";
 const CreateBrandBody = z.object({
   name: z.string().trim().min(2).max(200),
   avatarUrl: z.string().url().max(500).optional(),
+  slogan: z.string().trim().max(160).optional(),
   guidelines: z.record(z.unknown()).optional(),
   contactName: z.string().max(200).optional(),
   contactEmail: z.string().email().max(254).optional(),

@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 
+import { pageMetadata } from "@/lib/seo";
+
 import { LegalPage, Section } from "@/components/legal/legal-page";
 import { OPERATOR_NAME, PRODUCT_NAME, SUPPORT_EMAIL } from "@/lib/brand";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
   title: "Cookie policy",
   description: `The cookies ${PRODUCT_NAME} uses, and why.`,
-};
+  path: "/cookies",
+  siteName: PRODUCT_NAME,
+});
 export const dynamic = "force-static";
 
 const COOKIES = [

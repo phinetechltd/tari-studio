@@ -309,7 +309,7 @@ export default async function AiCreditsPage() {
 
       <p className="mt-8 flex items-start gap-2 text-xs text-muted">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden />
-        Higgsfield charges nothing for failed, blocked or cancelled requests, so only finished renders are counted. An organisation that saved its own Higgsfield key in its Settings pays Higgsfield directly and does not draw on this balance.
+        Higgsfield charges nothing for failed, blocked or cancelled requests, so only finished renders are counted. Every organisation draws on this balance; generation keys are platform-managed and cannot be entered per agency.
       </p>
     </>
   );

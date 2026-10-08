@@ -48,8 +48,13 @@ export type Permission =
   | "audit:read"
   | "brand:read"
   | "brand:write"
-  | "catalogue:read"
-  | "catalogue:write"
+  // Blog (core: every organisation may keep one; the public site shows the operator's)
+  | "blog:read"
+  | "blog:write"
+  // Products (module PRODUCTS)
+  | "product:read"
+  | "product:write"
+  | "product:stock"
   // Content Studio
   | "content:read"
   | "content:write"
@@ -77,6 +82,7 @@ export type Permission =
   | "token:buy"
   // Templates published by platform admins, and characters each agency keeps
   | "template:read"
+  | "template:write"
   | "character:read"
   | "character:write"
   // WhatsApp inbox and automations
@@ -85,7 +91,12 @@ export type Permission =
   | "automation:write"
   // Leads
   | "lead:read"
-  | "lead:write";
+  | "lead:write"
+  // Autopilot
+  | "autopilot:read"
+  | "autopilot:write"
+  // The in-app assistant (what it can do on a person's behalf is still limited by their own permissions)
+  | "assistant:use";
 
 /**
  * Which module owns each permission. Permissions absent from this map belong to
@@ -113,6 +124,7 @@ export const PERMISSION_MODULE: Partial<Record<Permission, ModuleKey>> = {
   "order:write": "AI_CONTENT",
   "token:buy": "AI_CONTENT",
   "template:read": "AI_CONTENT",
+  "template:write": "AI_CONTENT",
   "character:read": "AI_CONTENT",
   "character:write": "AI_CONTENT",
 
@@ -122,6 +134,13 @@ export const PERMISSION_MODULE: Partial<Record<Permission, ModuleKey>> = {
 
   "lead:read": "LEADS_CRM",
   "lead:write": "LEADS_CRM",
+
+  "product:read": "PRODUCTS",
+  "product:write": "PRODUCTS",
+  "product:stock": "PRODUCTS",
+
+  "autopilot:read": "AUTOPILOT",
+  "autopilot:write": "AUTOPILOT",
 };
 
 /**
@@ -134,7 +153,7 @@ export const MFA_PERMISSIONS: ReadonlySet<Permission> = new Set<Permission>([
   "member:write",
 ]);
 
-const READ_BASICS: Permission[] = ["org:read", "brand:read", "catalogue:read"];
+const READ_BASICS: Permission[] = ["org:read", "brand:read", "product:read", "blog:read"];
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   SUPER_ADMIN: ["platform:manage"], // expanded to everything below
@@ -146,7 +165,12 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "member:write",
     "audit:read",
     "brand:write",
-    "catalogue:write",
+    "product:write",
+    "product:stock",
+    "autopilot:read",
+    "autopilot:write",
+    "assistant:use",
+    "blog:write",
     "content:read",
     "task:write",
     "content:approve",
@@ -163,6 +187,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "order:read",
     "order:write",
     "template:read",
+    "template:write",
     "character:read",
     "character:write",
     "token:buy",
@@ -176,8 +201,13 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   BRAND_MANAGER: [
     ...READ_BASICS,
     "member:read",
+    "blog:write",
     "brand:write",
-    "catalogue:write",
+    "product:write",
+    "product:stock",
+    "autopilot:read",
+    "autopilot:write",
+    "assistant:use",
     "content:read",
     "task:write",
     "channel:read",
@@ -192,6 +222,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "order:read",
     "order:write",
     "template:read",
+    "template:write",
     "character:read",
     "character:write",
     "token:buy",
@@ -215,14 +246,20 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "report:read",
     "inbox:read",
     "lead:read",
+    "autopilot:read",
   ],
 
   // The narrowest principal, and possibly a freelancer working for several
   // agencies. Sees only tasks assigned to them (`isSelfScoped`).
-  DESIGNER: ["brand:read", "catalogue:read", "task:work"],
+  DESIGNER: ["brand:read", "product:read", "task:work"],
 
   MARKETER: [
     ...READ_BASICS,
+    "blog:write",
+    "product:write",
+    "autopilot:read",
+    "autopilot:write",
+    "assistant:use",
     "content:read",
     "task:write",
     "post:read",
@@ -233,6 +270,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "ai:generate",
     "order:read",
     "template:read",
+    "template:write",
     "character:read",
     "character:write",
     "inbox:read",
@@ -254,6 +292,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "character:read",
     "inbox:read",
     "lead:read",
+    "autopilot:read",
   ],
 };
 

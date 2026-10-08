@@ -51,6 +51,10 @@ async function scheduleRecurring(now = new Date()): Promise<void> {
   await enqueue("system.prune", {}, { dedupeKey: `system.prune:${hour}`, maxAttempts: 2 });
   const minute = now.toISOString().slice(0, 16); // 2026-09-21T15:04
   await enqueue("billing.sweep", {}, { dedupeKey: `billing.sweep:${minute}`, maxAttempts: 1 });
+  // TikTok has no comment webhooks for the Business API: look every three minutes.
+  const threeMinutes = Math.floor(now.getTime() / 180_000);
+  await enqueue("tiktok.comments", {}, { dedupeKey: `tiktok.comments:${threeMinutes}`, maxAttempts: 1 });
+  await enqueue("autopilot.tick", {}, { dedupeKey: `autopilot.tick:${minute}`, maxAttempts: 1 });
 }
 
 async function main(): Promise<void> {

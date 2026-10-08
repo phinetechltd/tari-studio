@@ -7,6 +7,7 @@ import { AiTestButton } from "@/components/settings/ai-test-button";
 import { GatewayForm } from "@/components/settings/gateway-forms";
 import { PlatformSettingsEditor } from "@/components/settings/platform-settings-editor";
 import { Badge, Notice, PageHeader, SectionTitle, TableWrap } from "@/components/ui";
+import { PRODUCT_NAME } from "@/lib/brand";
 import { PLATFORM_GROUPS } from "@/lib/platform-settings-catalog";
 import { platformSettingsStatus } from "@/server/platform-settings";
 import { db } from "@/lib/db";
@@ -36,9 +37,10 @@ function Row(props: { name: string; state: "live" | "simulated" | "missing" | "o
 
 /**
  * Settings: what this deployment is connected to (never a secret, only whether
- * one is loaded), a live AI test, the organisation's own gateway keys (sealed
- * at rest, src/server/gateways.ts), and its modules and limits. The server
- * environment supplies the defaults an organisation's own keys override.
+ * one is loaded), a live AI test, the organisation's own social media app
+ * credentials (sealed at rest, src/server/gateways.ts), and its modules and
+ * limits. AI and payment credentials are platform-managed by the platform
+ * admin; agencies cannot enter their own.
  */
 export default async function SettingsPage() {
   const { principal } = await requireSession();
@@ -64,11 +66,6 @@ export default async function SettingsPage() {
   ]);
 
   const aiPrimary = ai.chain[0];
-  // An organisation's own provider and key (saved below) run ahead of the deployment's chain.
-  const orgAi = gateways.gateways.ai?.fields;
-  const orgField = (name: string) => orgAi?.find((f) => f.name === name);
-  const orgProvider = orgField("provider")?.source === "org" ? orgField("provider")?.value : null;
-  const orgKey = orgField("apiKey")?.source === "org";
 
   return (
     <>
@@ -77,16 +74,17 @@ export default async function SettingsPage() {
         subtitle={org ? `${org.name} · ${ROLE_LABELS[principal.role]} · ${org.plan.charAt(0)}${org.plan.slice(1).toLowerCase()} plan` : "Platform admin"}
       />
       <Hint id="settings.intro" title="Most teams never need to change these">
-        Your organisation can use its own AI or Higgsfield keys here; otherwise the platform&apos;s are used. Your plan&apos;s limits are listed below.
+        AI runs on {PRODUCT_NAME}'s platform-managed models; your plan's limits are listed below. Here you connect
+        your own social media app and see what this deployment is using.
       </Hint>
 
       {platform ? (
         <section className="mb-8" aria-labelledby="deployment">
           <SectionTitle id="deployment">Deployment keys</SectionTitle>
           <p className="mb-4 max-w-3xl text-sm text-muted">
-            Set the Claude key and every other provider for the whole platform here instead of the server&apos;s .env. Keys are
-            sealed on the server and never shown again. An agency&apos;s own keys (its Settings → Gateways) still win for that
-            agency.
+            Set the AI keys and every other provider for the whole platform here instead of the server's .env. Keys are
+            sealed on the server and never shown again. Every agency runs on these keys; agencies only manage their
+            own social media apps.
           </p>
           <PlatformSettingsEditor groups={PLATFORM_GROUPS} settings={platform.settings} vaultReady={platform.vaultReady} />
         </section>
@@ -100,18 +98,6 @@ export default async function SettingsPage() {
         <section className="card p-5" aria-labelledby="ai">
           <SectionTitle id="ai">AI models</SectionTitle>
           <ul className="mb-4 text-sm">
-            {orgProvider && orgProvider !== "fixtures" ? (
-              <Row
-                name="This organisation"
-                state={orgKey ? "live" : "missing"}
-                detail={
-                  <>
-                    {orgProvider} · {orgField("model")?.value ?? "default model"} — your own key, used before the deployment&apos;s
-                    {orgKey ? "" : ". Save an API key under Gateways to use it"}
-                  </>
-                }
-              />
-            ) : null}
             {ai.chain.map((c, i) => (
               <Row
                 key={`${c.provider}-${i}`}
@@ -121,7 +107,7 @@ export default async function SettingsPage() {
                   c.provider === "fixtures" ? (
                     platformMode
                       ? "Fixture replies for development. Choose Anthropic and add the key under Deployment keys above to use Claude."
-                      : "Fixture replies for development. Add your own Claude key under Gateways, or ask the platform admin to set one."
+                      : "Fixture replies for development. Ask the platform admin to set the platform's AI key."
                   ) : (
                     <>
                       {c.provider} · {c.model}
@@ -142,16 +128,17 @@ export default async function SettingsPage() {
           <SectionTitle id="integrations">{orgId ? "Gateways" : "Webhook"}</SectionTitle>
           {orgId ? (
             <p className="mb-4 text-sm text-muted">
-              This agency&apos;s own keys, sealed at rest and never shown again. A blank field keeps the current value; the
-              platform&apos;s deployment keys apply until the agency sets its own.
+              Your agency's own Meta app, sealed at rest and never shown again. A blank field keeps the current
+              value; the platform's settings apply until the agency saves its own. AI and payment keys are not
+              managed here — they belong to the platform.
             </p>
           ) : null}
           <div className={orgId ? "space-y-5" : "hidden"}>
-            {(["ai", "video", "social", "mpesa"] as const).map((key) => {
+            {(["social"] as const).map((key) => {
               const g = gateways.gateways[key];
               if (!g) return null;
               return (
-                <details key={key} className="rounded-xl border border-wash/[0.08] p-4" open={key === "ai"}>
+                <details key={key} className="rounded-xl border border-wash/[0.08] p-4">
                   <summary className="cursor-pointer select-none">
                     <span className="font-medium">{g.name}</span>
                     <span className="mt-1 block text-sm text-muted">{g.summary}</span>

@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test";
 import { execSync } from "child_process";
-import { writeFileSync } from "fs";
 
 const EMAIL = "owner@demo.test";
 const PASSWORD = "Demo@2026-Agency";
 const BASE_URL = "http://localhost:3400";
+const SHOTS = "C:/Users/ondie/AppData/Local/Hermes/scratch/screenshots";
 
 function getTotp(): string {
   const out = execSync(
@@ -17,92 +17,57 @@ function getTotp(): string {
 test("full QA walkthrough with screenshots", async ({ page }) => {
   // Step 1: Open login
   console.log("Step 1: Navigating to login page...");
-  await page.goto(`${BASE_URL}/login`, { waitUntil: "networkidle" });
-  await page.screenshot({ path: "C:/Users/ondie/AppData/Local/Hermes/scratch/screenshots/01_admin_login.png" });
-  console.log("  Screenshot saved: 01_admin_login.png");
+  await page.goto(`${BASE_URL}/login`, { waitUntil: "domcontentloaded" });
+  await page.screenshot({ path: `${SHOTS}/01_admin_login.png` });
 
   // Step 2: Fill email + password
   console.log("Step 2: Filling credentials...");
   await page.locator("#email").fill(EMAIL);
   await page.locator("#password").fill(PASSWORD);
   await page.getByRole("button", { name: "Sign in" }).click();
-  await page.waitForTimeout(2000);
 
-  // Step 3: Handle TOTP
+  // Step 3: TOTP only when the flow asks for it; either way, wait until the console home is up.
   console.log("Step 3: Checking for TOTP...");
-  const totpVisible = await page.locator("#totp").isVisible().catch(() => false);
+  const totpVisible = await page
+    .locator("#totp")
+    .waitFor({ state: "visible", timeout: 4000 })
+    .then(() => true)
+    .catch(() => false);
   if (totpVisible) {
     const code = getTotp();
-    console.log(`  TOTP code: ${code}`);
+    console.log("  TOTP code entered");
     await page.locator("#totp").fill(code);
     await page.getByRole("button", { name: "Verify and sign in" }).click();
-    await page.waitForURL("**/app**", { timeout: 15000 });
   } else {
-    console.log("  No TOTP required - already authenticated or flow changed");
+    console.log("  No TOTP required");
   }
-
-  await page.screenshot({ path: "C:/Users/ondie/AppData/Local/Hermes/scratch/screenshots/02_admin_dashboard.png" });
+  await page.waitForURL("**/app**", { timeout: 20000 });
+  await page.screenshot({ path: `${SHOTS}/02_admin_dashboard.png` });
   console.log("  Screenshot saved: 02_admin_dashboard.png");
 
-  // Step 4: Navigate to Brands
-  try {
-    await page.getByRole("link", { name: "Brands" }).first().click();
-    await page.waitForURL("**/app/brands**", { timeout: 5000 });
-    await page.screenshot({ path: "C:/Users/ondie/AppData/Local/Hermes/scratch/screenshots/03_admin_brands.png" });
-    console.log("Step 4: Brands page - OK");
-  } catch (e) {
-    console.log("Step 4: Brands navigation failed:", (e as Error).message.substring(0, 100));
+  const sections: Array<[string, RegExp | string, RegExp, string]> = [
+    // [step, link name, url match, screenshot]
+    ["4", /^Brands$/, /\/app\/brands/, "03_admin_brands"],
+    ["5", /Studio/, /\/content/, "04_admin_studio"],
+    ["6", /^Social$/, /\/app\/social/, "05_admin_channels"],
+    ["7", /^Campaigns$/, /\/app\/campaigns/, "06_admin_campaigns"],
+    ["8", /^Products$/, /\/app\/products/, "07_admin_products"],
+    ["9", /^Team$/, /\/app\/team/, "08_admin_team"],
+  ];
+
+  for (const [step, link, url, shot] of sections) {
+    try {
+      // Scope to the nav rail: an unscoped /Studio/ match hits the "Tari Studio" logo link first.
+      await page.locator("nav").getByRole("link", { name: link }).first().click();
+      await page.waitForURL(url, { timeout: 15000 });
+      await page.screenshot({ path: `${SHOTS}/${shot}.png` });
+      console.log(`Step ${step}: ${shot} - OK (${page.url()})`);
+    } catch (e) {
+      console.log(`Step ${step}: navigation failed:`, (e as Error).message.substring(0, 100));
+    }
   }
 
-  // Step 5: Navigate to Content Studio
-  try {
-    await page.getByRole("link", { name: "Content Studio" }).first().click();
-    await page.waitForURL("**/app/content**", { timeout: 5000 });
-    await page.screenshot({ path: "C:/Users/ondie/AppData/Local/Hermes/scratch/screenshots/04_admin_content.png" });
-    console.log("Step 5: Content page - OK");
-  } catch (e) {
-    console.log("Step 5: Content navigation failed:", (e as Error).message.substring(0, 100));
-  }
-
-  // Step 6: Navigate to Channels
-  try {
-    await page.getByRole("link", { name: "Channels" }).first().click();
-    await page.waitForURL("**/app/social**", { timeout: 5000 });
-    await page.screenshot({ path: "C:/Users/ondie/AppData/Local/Hermes/scratch/screenshots/05_admin_channels.png" });
-    console.log("Step 6: Channels page - OK");
-  } catch (e) {
-    console.log("Step 6: Channels navigation failed:", (e as Error).message.substring(0, 100));
-  }
-
-  // Step 7: Navigate to Campaigns
-  try {
-    await page.getByRole("link", { name: "Campaigns" }).first().click();
-    await page.waitForURL("**/app/campaigns**", { timeout: 5000 });
-    await page.screenshot({ path: "C:/Users/ondie/AppData/Local/Hermes/scratch/screenshots/06_admin_campaigns.png" });
-    console.log("Step 7: Campaigns page - OK");
-  } catch (e) {
-    console.log("Step 7: Campaigns navigation failed:", (e as Error).message.substring(0, 100));
-  }
-
-  // Step 8: Navigate to Catalogue
-  try {
-    await page.getByRole("link", { name: "Catalogue" }).first().click();
-    await page.waitForURL("**/app/catalogue**", { timeout: 5000 });
-    await page.screenshot({ path: "C:/Users/ondie/AppData/Local/Hermes/scratch/screenshots/07_admin_catalogue.png" });
-    console.log("Step 8: Catalogue page - OK");
-  } catch (e) {
-    console.log("Step 8: Catalogue navigation failed:", (e as Error).message.substring(0, 100));
-  }
-
-  // Step 9: Navigate to Team
-  try {
-    await page.getByRole("link", { name: "Team" }).first().click();
-    await page.waitForURL("**/app/team**", { timeout: 5000 });
-    await page.screenshot({ path: "C:/Users/ondie/AppData/Local/Hermes/scratch/screenshots/08_admin_team.png" });
-    console.log("Step 9: Team page - OK");
-  } catch (e) {
-    console.log("Step 9: Team navigation failed:", (e as Error).message.substring(0, 100));
-  }
-
+  // The walkthrough must have ended inside the console.
+  expect(page.url()).toContain("/app");
   console.log("\nAdmin QA walkthrough complete!");
 });

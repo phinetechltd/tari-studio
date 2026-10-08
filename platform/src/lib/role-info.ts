@@ -17,7 +17,8 @@ export const PERMISSION_GROUPS: Array<{ title: string; items: Array<{ key: strin
     { key: "member:read", label: "See members" }, { key: "member:write", label: "Invite and manage members" },
     { key: "audit:read", label: "Read the audit log" },
     { key: "brand:read", label: "See brands" }, { key: "brand:write", label: "Edit brands" },
-    { key: "catalogue:read", label: "See the catalogue" }, { key: "catalogue:write", label: "Edit the catalogue" },
+    { key: "product:read", label: "See products" }, { key: "product:write", label: "Edit products" },
+    { key: "product:stock", label: "Change stock counts" },
   ] },
   { title: "Content", items: [
     { key: "content:read", label: "See content" }, { key: "content:write", label: "Write content" },
@@ -35,6 +36,12 @@ export const PERMISSION_GROUPS: Array<{ title: string; items: Array<{ key: strin
     { key: "asset:read", label: "See the media library" }, { key: "asset:write", label: "Manage media" },
     { key: "template:read", label: "Use templates" },
     { key: "character:read", label: "See characters" }, { key: "character:write", label: "Create characters" },
+  ] },
+  { title: "Assistant", items: [
+    { key: "assistant:use", label: "Chat with the assistant" },
+  ] },
+  { title: "Autopilot", items: [
+    { key: "autopilot:read", label: "See Autopilot and its runs" }, { key: "autopilot:write", label: "Create and change Autopilots" },
   ] },
   { title: "Orders and money", items: [
     { key: "order:read", label: "See orders" }, { key: "order:write", label: "Produce orders" },

@@ -11,6 +11,8 @@ const Body = z.object({
   campaignId: z.string().min(1).nullable().optional(),
   /** ISO time; omitted or in the past means "now". */
   scheduledAt: z.string().datetime().nullable().optional(),
+  /** TikTok channels only: privacy and interaction choices (validated in schedulePosts) */
+  tiktok: z.unknown().optional(),
 });
 
 export const GET = handler({ permission: "post:read" }, async ({ principal, searchParams }) => {

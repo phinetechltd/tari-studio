@@ -5,7 +5,7 @@ import { AuthShell } from "@/components/auth/auth-shell";
 
 import { ForgotForm } from "./forgot-form";
 
-export const metadata: Metadata = { title: "Reset your password" };
+export const metadata: Metadata = { title: "Reset your password", robots: { index: false, follow: true } };
 export const dynamic = "force-dynamic";
 
 export default function ForgotPasswordPage() {

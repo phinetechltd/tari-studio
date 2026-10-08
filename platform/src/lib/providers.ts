@@ -12,7 +12,7 @@ import { env, isProduction } from "./env";
  * The failure is loud and immediate, at the first call, not a quiet no-op.
  */
 
-export type ProviderKind = "EMAIL" | "SMS" | "META" | "AI" | "PAYMENT" | "PAYSTACK" | "GENERATION";
+export type ProviderKind = "EMAIL" | "SMS" | "META" | "AI" | "PAYMENT" | "PAYSTACK" | "GENERATION" | "TIKTOK" | "PINTEREST";
 
 const STAND_INS: Record<ProviderKind, string> = {
   EMAIL: "console",
@@ -22,6 +22,8 @@ const STAND_INS: Record<ProviderKind, string> = {
   PAYMENT: "simulator",
   PAYSTACK: "simulator",
   GENERATION: "simulator",
+  TIKTOK: "simulator",
+  PINTEREST: "simulator",
 };
 
 export class StandInProviderError extends Error {
@@ -50,6 +52,8 @@ export function configuredProviderName(kind: ProviderKind): string {
     PAYMENT: e.PAYMENT_PROVIDER,
     PAYSTACK: e.PAYSTACK_PROVIDER,
     GENERATION: e.GENERATION_PROVIDER,
+    TIKTOK: e.TIKTOK_PROVIDER,
+    PINTEREST: e.PINTEREST_PROVIDER,
   };
   return names[kind];
 }

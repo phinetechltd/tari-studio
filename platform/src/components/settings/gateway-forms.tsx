@@ -17,11 +17,6 @@ export interface GatewayStatus {
   }>;
 }
 
-const PROVIDER_OPTIONS = [
-  { value: "anthropic", label: "Anthropic (Claude)" },
-  { value: "nvidia", label: "NVIDIA NIM" },
-];
-
 /** One gateway's editable form. Secrets arrive masked; blank keeps the stored one. */
 export function GatewayForm({ gateway, status }: { gateway: string; status: GatewayStatus }) {
   if (!status.vaultReady) {
@@ -35,8 +30,7 @@ export function GatewayForm({ gateway, status }: { gateway: string; status: Gate
   const fields: FormField[] = status.fields.map((f) => ({
     name: f.name,
     label: f.secret ? `${f.label} (leave blank to keep)` : f.label,
-    type: gateway === "ai" && f.name === "provider" ? "select" : f.secret ? "password" : "text",
-    options: gateway === "ai" && f.name === "provider" ? PROVIDER_OPTIONS : undefined,
+    type: f.secret ? "password" : "text",
     required: false,
     autoComplete: "off",
     placeholder:

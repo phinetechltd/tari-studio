@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useRef, useState, type FormEvent } from "react";
 
 import { callApi } from "@/components/landing/order-events";
+import { INPUT_IMAGE_HELP, INPUT_IMAGE_LIMITS } from "@/lib/generation-models";
 
 export interface CharacterFormValues {
   id?: string;
@@ -158,7 +159,7 @@ export function CharacterForm({ initial, brands }: { initial: CharacterFormValue
           {picked.length > 0 ? `${picked.length} image${picked.length === 1 ? "" : "s"} chosen` : "Choose images"}
           <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" multiple className="sr-only" onChange={(e) => setPicked(Array.from(e.target.files ?? []))} />
         </label>
-        <p className="mt-1 text-xs text-muted">PNG, JPEG or WebP, up to 10 MB each, at most 6 per character. Front-on, well-lit photos work best.</p>
+        <p className="mt-1 text-xs text-muted">{INPUT_IMAGE_HELP} At most {INPUT_IMAGE_LIMITS.perItem} per character. Front-on, well-lit photos work best.</p>
       </div>
 
       {error && <p className="rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger" role="alert">{error}</p>}
