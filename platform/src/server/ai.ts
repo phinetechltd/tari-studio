@@ -634,6 +634,18 @@ async function chatFixtures(call: ChatCall): Promise<ProviderOutput> {
   const lower = said.toLowerCase();
   const hasTool = (k: string) => call.system.includes(`- ${k}:`);
   const after = (re: RegExp) => re.exec(said)?.[1]?.trim();
+  // The image → form service asks for bare suggestions JSON: answer with a
+  // sample set, so every upload-and-fill screen can be tried without a model.
+  if (/reply with only compact json/i.test(call.system)) {
+    const text = JSON.stringify({
+      title: "Fresh market basket",
+      description: "A colourful basket of fresh produce, picked this morning and ready for your shop.",
+      caption: "Fresh from the market this morning. Visit us for the best prices in town.",
+      keywords: ["fresh produce", "market day", "farm fresh"],
+      hashtags: ["#FreshProduce", "#MarketDay", "#FarmFresh"],
+    });
+    return { text, requestId: `fixtures_${crypto.randomUUID()}`, model: call.model, inputTokens: Math.ceil((call.system.length + said.length) / 4), outputTokens: Math.ceil(text.length / 4), cacheReadTokens: 0, cacheWriteTokens: 0 };
+  }
   let out: { message: string; calls: Array<{ tool: string; args: Record<string, unknown> }> };
   if (/^tool results/i.test(said)) {
     out = { message: "Here is what I found. Tell me what you would like to do next.", calls: [] };

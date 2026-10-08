@@ -42,9 +42,14 @@ export function useImageAutofill(props: {
   const stateRef = useRef(state);
   stateRef.current = state;
 
-  const run = useCallback(async () => {
+  /**
+   * Runs the autofill. `fileOverride` is for the moment a file is picked: the
+   * getter reads React state, which is still the previous render's value in
+   * that same handler, so the caller hands the new file over directly.
+   */
+  const run = useCallback(async (fileOverride?: File | null) => {
     const fields = props.getFields();
-    const file = props.getFile?.() ?? null;
+    const file = fileOverride !== undefined ? fileOverride : (props.getFile?.() ?? null);
     const assetId = props.getAssetId?.() ?? null;
     if (file === null && !assetId) return;
     setState((s) => ({ ...s, busy: true, quietReason: null }));

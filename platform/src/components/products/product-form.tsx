@@ -247,7 +247,7 @@ export function ProductForm({ initial, brands }: { initial: ProductFormValues; b
             onChange={(e) => {
               const files = Array.from(e.target.files ?? []);
               setPicked(files);
-              if (files[0] && (!v.name.trim() || !v.description.trim())) void autofill.run();
+              if (files[0] && (!v.name.trim() || !v.description.trim())) void autofill.run(files[0]);
             }}
           />
         </label>
