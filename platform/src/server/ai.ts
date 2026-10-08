@@ -216,6 +216,36 @@ export function resolveModel(model: string): string {
 }
 
 /**
+ * The trial API's shared workers cap concurrent requests (503
+ * ResourceExhausted: "Worker local total request limit reached"). A blip like
+ * that recovers in a moment, so these statuses are retried twice with a short
+ * backoff instead of failing the turn at once.
+ */
+const NVIDIA_RETRIES = 3;
+const NVIDIA_RETRY_STATUS = new Set([429, 502, 503, 504]);
+
+async function nvidiaFetch(model: string, body: object): Promise<Response> {
+  let last: unknown = null;
+  for (let attempt = 1; attempt <= NVIDIA_RETRIES; attempt++) {
+    try {
+      const response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env().NVIDIA_API_KEY?.trim()}`, "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(env().AI_TIMEOUT_SEC * 1000),
+      });
+      if (response.ok || !NVIDIA_RETRY_STATUS.has(response.status) || attempt === NVIDIA_RETRIES) return response;
+      last = new AiProviderError("nvidia", resolveModel(model), response.status, `NVIDIA API error ${response.status}`);
+    } catch (e) {
+      last = e;
+      if (attempt === NVIDIA_RETRIES) throw e;
+    }
+    await new Promise((r) => setTimeout(r, attempt * 1500));
+  }
+  throw last;
+}
+
+/**
  * The default chat model for NVIDIA: the Nano Omni is multimodal (text and
  * images in one model) and answered fastest on the production trial tier —
  * Kimi K3 (2.8T) times out there, so it stays selectable but is not the
@@ -230,22 +260,12 @@ async function callNvidia({ prompt, model, maxTokens, system }: ProviderCall): P
   if (!apiKey) throw new AiNotConfiguredError("NVIDIA_API_KEY is not set.");
 
   const resolved = resolveModel(model);
-  let response: Response;
-  try {
-    response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: resolved,
-        messages: [...(system ? [{ role: "system", content: system }] : []), { role: "user", content: prompt }],
-        max_tokens: maxTokens,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(env().AI_TIMEOUT_SEC * 1000),
-    });
-  } catch (e) {
-    throw new AiProviderError("nvidia", resolved, null, `NVIDIA request failed: ${describe(e)}`);
-  }
+  const response = await nvidiaFetch(resolved, {
+    model: resolved,
+    messages: [...(system ? [{ role: "system", content: system }] : []), { role: "user", content: prompt }],
+    max_tokens: maxTokens,
+    stream: false,
+  });
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     throw new AiProviderError("nvidia", resolved, response.status, `NVIDIA API error ${response.status}: ${body.slice(0, 300)}`);
@@ -581,34 +601,24 @@ async function chatNvidia(call: ChatCall): Promise<ProviderOutput> {
   const apiKey = env().NVIDIA_API_KEY?.trim();
   if (!apiKey) throw new AiNotConfiguredError("NVIDIA_API_KEY is not set.");
   const resolved = resolveModel(call.model);
-  let response: Response;
-  try {
-    response = await fetch("https://integrate.api.nvidia.com/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: resolved,
-        messages: [
-          { role: "system", content: call.system },
-          ...call.messages.map((m) => ({
-            role: m.role,
-            content:
-              m.images?.length && call.vision
-                ? [
-                    { type: "text", text: m.content || "(picture attached)" },
-                    ...m.images.map((img) => ({ type: "image_url", image_url: { url: `data:${img.mimeType};base64,${img.dataBase64}` } })),
-                  ]
-                : m.content,
-          })),
-        ],
-        max_tokens: call.maxTokens,
-        stream: false,
-      }),
-      signal: AbortSignal.timeout(env().AI_TIMEOUT_SEC * 1000),
-    });
-  } catch (e) {
-    throw new AiProviderError("nvidia", resolved, null, `NVIDIA request failed: ${describe(e)}`);
-  }
+  const response = await nvidiaFetch(resolved, {
+    model: resolved,
+    messages: [
+      { role: "system", content: call.system },
+      ...call.messages.map((m) => ({
+        role: m.role,
+        content:
+          m.images?.length && call.vision
+            ? [
+                { type: "text", text: m.content || "(picture attached)" },
+                ...m.images.map((img) => ({ type: "image_url", image_url: { url: `data:${img.mimeType};base64,${img.dataBase64}` } })),
+              ]
+            : m.content,
+      })),
+    ],
+    max_tokens: call.maxTokens,
+    stream: false,
+  });
   if (!response.ok) {
     throw new AiProviderError("nvidia", resolved, response.status, `NVIDIA API error ${response.status}: ${(await response.text().catch(() => "")).slice(0, 300)}`);
   }
