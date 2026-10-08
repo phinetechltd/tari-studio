@@ -215,8 +215,13 @@ export function resolveModel(model: string): string {
   return NVIDIA_MODEL_MAP[model] ?? model;
 }
 
-/** The default chat model for NVIDIA: Kimi K3 is multimodal, so one default serves text and image work. */
-export const NVIDIA_DEFAULT_MODEL = "moonshotai/kimi-k3";
+/**
+ * The default chat model for NVIDIA: the Nano Omni is multimodal (text and
+ * images in one model) and answered fastest on the production trial tier —
+ * Kimi K3 (2.8T) times out there, so it stays selectable but is not the
+ * default.
+ */
+export const NVIDIA_DEFAULT_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning";
 /** Cheaper model for one-line tasks (classification, short copy). */
 export const NVIDIA_QUICK_MODEL = "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning";
 
